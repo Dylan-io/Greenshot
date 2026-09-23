@@ -1,6 +1,6 @@
-# Backend Supabase — CleanShoot
+# Backend Supabase — Greenshot
 
-Ce dossier contient l'ensemble des migrations PostgreSQL, fonctions PostGIS et règles RLS pour déployer le backend CleanShoot sur Supabase.
+Ce dossier contient l'ensemble des migrations PostgreSQL, fonctions PostGIS et règles RLS pour déployer le backend Greenshot sur Supabase.
 
 ---
 
@@ -8,7 +8,7 @@ Ce dossier contient l'ensemble des migrations PostgreSQL, fonctions PostGIS et r
 
 ### 1. Créer le projet Supabase
 1. Rendez-vous sur le dashboard [Supabase](https://supabase.com).
-2. Créez un projet nommé **CleanShoot**.
+2. Créez un projet nommé **Greenshot**.
 3. Définissez un mot de passe sécurisé pour la base de données.
 
 ### 2. Récupérer les identifiants pour le Frontend

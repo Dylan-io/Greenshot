@@ -91,7 +91,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { supabase } from '../services/supabaseClient'
+import { supabase, supabaseConfigured } from '../services/supabaseClient'
 import { useUserStore } from '../stores/userStore'
 import imageCompression from 'browser-image-compression'
 
@@ -141,25 +141,34 @@ function capturerGps() {
 }
 
 async function chargerCategories() {
+  if (!supabaseConfigured) {
+    appliquerCategoriesSecours()
+    return
+  }
+
   try {
     const { data } = await supabase.from('categories').select('*').order('points_signalement', { ascending: false })
     if (data && data.length > 0) {
       categoriesDisponibles.value = data
       categorieChoisie.value = data[0].id
     } else {
-      // Valeurs de secours
-      categoriesDisponibles.value = [
-        { id: '1', nom: 'Déchets plastiques', points_signalement: 10 },
-        { id: '2', nom: 'Décharge sauvage', points_signalement: 15 },
-        { id: '3', nom: 'Pollution eau', points_signalement: 20 },
-        { id: '4', nom: 'Déforestation', points_signalement: 20 },
-        { id: '5', nom: 'Autre', points_signalement: 10 }
-      ]
-      categorieChoisie.value = '1'
+      appliquerCategoriesSecours()
     }
   } catch (err) {
     console.warn('Erreur chargement categories:', err)
+    appliquerCategoriesSecours()
   }
+}
+
+function appliquerCategoriesSecours() {
+  categoriesDisponibles.value = [
+    { id: '1', nom: 'Déchets plastiques', points_signalement: 10 },
+    { id: '2', nom: 'Décharge sauvage', points_signalement: 15 },
+    { id: '3', nom: 'Pollution eau', points_signalement: 20 },
+    { id: '4', nom: 'Déforestation', points_signalement: 20 },
+    { id: '5', nom: 'Autre', points_signalement: 10 }
+  ]
+  categorieChoisie.value = '1'
 }
 
 function gererSelectionPhoto(event) {

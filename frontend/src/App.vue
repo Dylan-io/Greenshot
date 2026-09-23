@@ -1,10 +1,10 @@
 <template>
-  <div id="cleanshoot-app">
-    <!-- Barre de navigation principale CleanShoot -->
+  <div id="greenshot-app">
+    <!-- Barre de navigation principale Greenshot -->
     <header class="app-header">
       <div class="header-container">
         <router-link to="/" class="logo-link">
-          <h1 class="logo">Clean<span>Shoot</span> 🌍</h1>
+          <h1 class="logo">Green<span>shot</span> 🌍</h1>
         </router-link>
         <nav class="main-nav">
           <router-link to="/">Signaler</router-link>
@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-// Application Shell CleanShoot
+// Application Shell Greenshot
 </script>
 
 <style>

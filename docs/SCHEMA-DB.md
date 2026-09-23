@@ -1,6 +1,6 @@
-# Schéma de la Base de Données — CleanShoot (Supabase / PostgreSQL)
+# Schéma de la Base de Données — Greenshot (Supabase / PostgreSQL)
 
-Ce document décrit en clair les tables, colonnes, types de données et relations du modèle validé pour CleanShoot V1.0.
+Ce document décrit en clair les tables, colonnes, types de données et relations du modèle validé pour Greenshot V1.0.
 
 ---
 

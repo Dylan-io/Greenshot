@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS public.categories (
     points_nettoyage INTEGER NOT NULL DEFAULT 30 CHECK (points_nettoyage > points_signalement)
 );
 
--- Données initiales de référence pour CleanShoot Burundi
+-- Données initiales de référence pour Greenshot Burundi
 INSERT INTO public.categories (nom, points_signalement, points_nettoyage)
 VALUES 
     ('Déchets plastiques', 10, 30),

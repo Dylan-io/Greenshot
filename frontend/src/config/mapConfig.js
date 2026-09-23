@@ -1,4 +1,4 @@
-// Configuration Cartographique CleanShoot (Leaflet + CARTO Basemaps)
+// Configuration Cartographique Greenshot (Leaflet + CARTO Basemaps)
 import pinEnAttente from '../assets/map-icons/pin-en-attente.svg'
 import pinVu from '../assets/map-icons/pin-vu.svg'
 import pinNettoye from '../assets/map-icons/pin-nettoye.svg'
@@ -25,7 +25,7 @@ export const MAP_CONFIG = {
     }
   },
 
-  // Configuration des statuts CleanShoot
+  // Configuration des statuts Greenshot
   statusConfig: {
     'en_attente': {
       color: '#B5502F', // Terre cuite
