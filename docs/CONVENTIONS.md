@@ -1,4 +1,4 @@
-# Conventions de Développement — CleanShoot
+# Conventions de Développement — Greenshot
 
 Pour garantir une collaboration fluide entre le Frontend et le Backend, voici les standards adoptés sur le projet.
 

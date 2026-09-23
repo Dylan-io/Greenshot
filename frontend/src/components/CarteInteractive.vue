@@ -6,7 +6,7 @@
     <!-- Légende Flottante Interactive -->
     <div class="map-legend">
       <div class="legend-header">
-        <span class="legend-title">Statuts CleanShoot</span>
+        <span class="legend-title">Statuts Greenshot</span>
         <button class="legend-toggle" @click="legendCollapsed = !legendCollapsed">
           {{ legendCollapsed ? '+' : '−' }}
         </button>
