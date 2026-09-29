@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import Accueil from '../views/Accueil.vue'
 import Signalement from '../views/Signalement.vue'
 import Carte from '../views/Carte.vue'
 import Nettoyage from '../views/Nettoyage.vue'
@@ -9,7 +10,12 @@ import Profil from '../views/Profil.vue'
 const routes = [
   {
     path: '/',
-    name: 'Signalement',
+    name: 'Accueil',
+    component: Accueil
+  },
+  {
+    path: '/signaler',
+    name: 'Signaler',
     component: Signalement
   },
   {
