@@ -46,15 +46,15 @@
           <label class="section-title">Photo du problème environnemental <span class="required">*</span></label>
         </div>
 
-        <input 
-          ref="inputFichier"
-          type="file" 
-          accept="image/*" 
-          capture="environment" 
-          class="file-input-hidden"
-          @change="gererChangementPhoto"
-          id="photo-input"
-        />
+        <div v-if="cameraOuverte" class="camera-capture-panel">
+          <video ref="videoElement" class="camera-video" autoplay playsinline muted></video>
+          <div class="camera-actions">
+            <button type="button" class="btn-camera-capture" @click="prendrePhoto" :disabled="!cameraPrete">
+              Capturer la photo
+            </button>
+            <button type="button" class="btn-camera-cancel" @click="fermerCamera">Annuler</button>
+          </div>
+        </div>
 
         <!-- Zone d'aperçu de photo si présente -->
         <div v-if="store.photoPreview" class="photo-preview-box">
@@ -65,10 +65,10 @@
               ✓ Photo prête <span v-if="store.photoTailleOriginale">({{ store.photoTailleOriginale }} Ko)</span>
             </span>
             <div class="photo-actions">
-              <button type="button" class="btn-photo-action" @click="ouvrirSelecteurFichier">
-                📸 Changer
+              <button type="button" class="btn-photo-action" @click="ouvrirCamera" :disabled="cameraOuverte">
+                📷 Reprendre
               </button>
-              <button type="button" class="btn-photo-action btn-danger" @click="store.supprimerPhoto">
+              <button type="button" class="btn-photo-action btn-danger" @click="supprimerPhotoCapturee">
                 🗑️ Supprimer
               </button>
             </div>
@@ -76,27 +76,22 @@
         </div>
 
         <!-- Zone d'upload vide si pas de photo -->
-        <div 
-          v-else 
-          class="upload-dropzone" 
-          @click="ouvrirSelecteurFichier"
-          tabindex="0"
-          role="button"
-          aria-label="Prendre ou sélectionner une photo"
-          @keydown.enter="ouvrirSelecteurFichier"
-          @keydown.space.prevent="ouvrirSelecteurFichier"
-        >
+        <button v-else type="button" class="upload-dropzone" @click="ouvrirCamera">
           <div class="dropzone-icon-circle">
             <svg class="camera-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
               <circle cx="12" cy="13" r="4"/>
             </svg>
           </div>
-          <p class="dropzone-label">Prendre une photo ou importer</p>
+          <p class="dropzone-label">Ouvrir la caméra</p>
           <span class="dropzone-hint">
-            Appareil photo sur mobile · Compression auto &lt; 1 Mo (éco data)
+            Capture directe · Aucun accès à la galerie
           </span>
-        </div>
+        </button>
+
+        <p v-if="photoPriseLe" class="photo-timestamp">
+          Photo capturée le {{ formaterDateHeure(photoPriseLe) }}
+        </p>
       </section>
 
       <!-- ÉTAPE 2 : Géolocalisation -->
@@ -250,7 +245,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSignalementStore } from '../stores/signalementStore'
 import { useUserStore } from '../stores/userStore'
@@ -259,16 +254,20 @@ const router = useRouter()
 const store = useSignalementStore()
 const userStore = useUserStore()
 
-const inputFichier = ref(null)
+const videoElement = ref(null)
+const cameraOuverte = ref(false)
+const cameraPrete = ref(false)
+const photoPriseLe = ref(null)
 const succesAffiche = ref(false)
 const dernierScoreGagne = ref(10)
+let cameraStream = null
 
 onMounted(async () => {
-  // 1. Initialiser le store et les catégories Supabase
   await store.chargerCategories()
-  
-  // 2. Déclencher automatiquement la demande de position GPS au chargement
-  store.capturerGeolocalisation()
+})
+
+onBeforeUnmount(() => {
+  arreterCamera()
 })
 
 const libelleProgression = computed(() => {
@@ -286,17 +285,82 @@ const libelleProgression = computed(() => {
   }
 })
 
-function ouvrirSelecteurFichier() {
-  if (inputFichier.value) {
-    inputFichier.value.click()
+async function ouvrirCamera() {
+  store.messageErreurEnvoi = ''
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    store.messageErreurEnvoi = 'La caméra nécessite un navigateur compatible et une connexion HTTPS (ou localhost).'
+    return
+  }
+
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' } }
+    })
+    cameraOuverte.value = true
+    await nextTick()
+    videoElement.value.srcObject = cameraStream
+    await videoElement.value.play()
+    cameraPrete.value = true
+  } catch (error) {
+    arreterCamera()
+    cameraOuverte.value = false
+    store.messageErreurEnvoi = error.name === 'NotAllowedError'
+      ? 'Autorisez l’accès à la caméra dans les réglages du navigateur, puis réessayez.'
+      : 'Impossible d’ouvrir la caméra. Vérifiez les permissions et réessayez.'
   }
 }
 
-function gererChangementPhoto(e) {
-  const file = e.target.files?.[0]
-  if (file) {
-    store.definirPhoto(file)
-  }
+function arreterCamera() {
+  cameraStream?.getTracks().forEach((track) => track.stop())
+  cameraStream = null
+  cameraPrete.value = false
+}
+
+function fermerCamera() {
+  arreterCamera()
+  cameraOuverte.value = false
+}
+
+function prendrePhoto() {
+  const video = videoElement.value
+  if (!video?.videoWidth || !video.videoHeight) return
+
+  const canvas = document.createElement('canvas')
+  canvas.width = video.videoWidth
+  canvas.height = video.videoHeight
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+  const captureMillis = Date.now()
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      store.messageErreurEnvoi = 'La photo n’a pas pu être capturée. Réessayez.'
+      return
+    }
+
+    fermerCamera()
+    const photo = new File([blob], `greenshot-${captureMillis}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: captureMillis
+    })
+
+    photoPriseLe.value = new Date(captureMillis)
+    store.definirPhoto(photo)
+    store.capturerGeolocalisation()
+  }, 'image/jpeg', 0.92)
+}
+
+function supprimerPhotoCapturee() {
+  store.supprimerPhoto()
+  photoPriseLe.value = null
+}
+
+function formaterDateHeure(date) {
+  return new Intl.DateTimeFormat('fr-BI', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(date)
 }
 
 async function declencherEnvoi() {
@@ -307,6 +371,7 @@ async function declencherEnvoi() {
   if (resultat?.success) {
     dernierScoreGagne.value = resultat.points || 10
     succesAffiche.value = true
+    photoPriseLe.value = null
 
     // Réinitialiser les champs tout en conservant le feedback
     store.reinitialiserFormulaire()
@@ -416,6 +481,9 @@ async function declencherEnvoi() {
   cursor: pointer;
   transition: all 0.2s ease;
   min-height: 160px;
+  width: 100%;
+  color: inherit;
+  font: inherit;
 }
 
 .upload-dropzone:hover,
@@ -458,6 +526,63 @@ async function declencherEnvoi() {
   font-size: 0.78rem;
   color: var(--color-text-muted, #64748b);
   max-width: 320px;
+}
+
+.camera-capture-panel {
+  overflow: hidden;
+  margin-bottom: 0.85rem;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-md, 12px);
+  background: #0f172a;
+}
+
+.camera-video {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.camera-actions {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  background: #fff;
+}
+
+.btn-camera-capture,
+.btn-camera-cancel {
+  min-height: 44px;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-camera-capture {
+  flex: 1;
+  border: 0;
+  background: var(--color-primary, #1f4d3a);
+  color: white;
+}
+
+.btn-camera-capture:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.btn-camera-cancel {
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: white;
+  color: var(--color-text, #0f172a);
+}
+
+.photo-timestamp {
+  margin-top: 0.55rem;
+  color: var(--color-text-muted, #64748b);
+  font-size: 0.8rem;
 }
 
 /* Photo Preview */

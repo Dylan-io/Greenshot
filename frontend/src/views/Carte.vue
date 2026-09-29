@@ -31,6 +31,13 @@
         </button>
 
       </div>
+      <div class="map-sync-status" aria-live="polite">
+        <span class="sync-dot" :class="{ live: realtimeActif }"></span>
+        <span>{{ realtimeActif ? 'Signalements en temps réel' : 'Actualisation automatique chaque minute' }}</span>
+        <button type="button" class="map-refresh-button" :disabled="store.chargementSignalements" @click="rafraichirSignalements">
+          Actualiser
+        </button>
+      </div>
     </div>
 
     <!-- Indicateur de chargement discret (Skeleton / Toast flottant) -->
@@ -65,15 +72,42 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useSignalementStore } from '../stores/signalementStore'
+import { supabase, supabaseConfigured } from '../services/supabaseClient'
 import CarteInteractive from '../components/CarteInteractive.vue'
 
 const store = useSignalementStore()
 
 const categoriesSelectionnees = ref([])
+const realtimeActif = ref(false)
+let realtimeChannel = null
+let refreshInterval = null
+let refreshTimeout = null
 
 onMounted(async () => {
+  if (supabaseConfigured) {
+    realtimeChannel = supabase
+      .channel('greenshot-carte-signalements')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'signalements'
+      }, () => {
+        clearTimeout(refreshTimeout)
+        refreshTimeout = setTimeout(rafraichirSignalements, 250)
+      })
+      .subscribe((status) => {
+        realtimeActif.value = status === 'SUBSCRIBED'
+      })
+  }
+
+  refreshInterval = setInterval(() => {
+    if (!realtimeActif.value && !store.chargementSignalements) {
+      rafraichirSignalements()
+    }
+  }, 60000)
+
   // 1. Charger les catégories si pas encore fait
   if (!store.categoriesChargees) {
     await store.chargerCategories()
@@ -87,6 +121,16 @@ onMounted(async () => {
     store.capturerGeolocalisation()
   }
 })
+
+onUnmounted(() => {
+  clearInterval(refreshInterval)
+  clearTimeout(refreshTimeout)
+  if (realtimeChannel) supabase.removeChannel(realtimeChannel)
+})
+
+function rafraichirSignalements() {
+  if (!store.chargementSignalements) return store.chargerTousLesSignalements()
+}
 
 const signalementsBruts = computed(() => {
   return store.listeSignalements || []
@@ -178,6 +222,50 @@ function compterSignalementsParCategorie(catId, catNom) {
   z-index: 500;
   padding: 0 10px;
   pointer-events: none;
+}
+
+.map-sync-status {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.15rem 0 0 0.65rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #475569;
+  font-size: 0.72rem;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+
+.sync-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+.sync-dot.live {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px #dcfce7;
+}
+
+.map-refresh-button {
+  padding: 0.2rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: white;
+  color: #334155;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.map-refresh-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .chips-scroll {

@@ -1,3 +1,4 @@
+
 # Backend Supabase — Greenshot
 
 Ce dossier contient l'ensemble des migrations PostgreSQL, fonctions PostGIS et règles RLS pour déployer le backend Greenshot sur Supabase.

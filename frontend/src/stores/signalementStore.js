@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase, supabaseConfigured } from '../services/supabaseClient'
+import { rechercherAdresse } from '../services/geocodage'
 import imageCompression from 'browser-image-compression'
 
 // Catégories de secours avec barème officiel Greenshot Burundi
@@ -107,6 +108,7 @@ export const useSignalementStore = defineStore('signalement', () => {
   function capturerGeolocalisation() {
     statutGps.value = 'en_cours'
     messageErreurGps.value = ''
+    zoneDetectee.value = 'Recherche de la ville et du quartier…'
 
     if (!('geolocation' in navigator)) {
       statutGps.value = 'erreur'
@@ -121,28 +123,18 @@ export const useSignalementStore = defineStore('signalement', () => {
         precisionGps.value = Math.round(pos.coords.accuracy || 0)
         statutGps.value = 'succes'
 
-        // Tentative de géocodage inversé léger pour enrichir l'affichage
-        zoneDetectee.value = 'Position GPS détectée'
+        zoneDetectee.value = `${latitude.value.toFixed(5)}, ${longitude.value.toFixed(5)}`
         try {
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 2500)
-
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude.value}&lon=${longitude.value}&zoom=14`,
-            { signal: controller.signal }
-          )
-          clearTimeout(timeoutId)
-
-          if (res.ok) {
-            const data = await res.json()
-            const adresse = data.address || {}
-            const quartier = adresse.suburb || adresse.neighbourhood || adresse.quarter || ''
-            const ville = adresse.city || adresse.town || adresse.village || 'Bujumbura'
-            zoneDetectee.value = quartier ? `${ville} (${quartier})` : ville
-          }
+          const adresse = await rechercherAdresse({
+            latitude: latitude.value,
+            longitude: longitude.value
+          })
+          const ville = adresse.ville || 'Ville non identifiée'
+          zoneDetectee.value = adresse.quartier
+            ? `${ville} (${adresse.quartier})`
+            : ville
         } catch {
-          // Si le géocodage inversé échoue (offline ou timeout), on garde le label GPS par défaut
-          zoneDetectee.value = `${latitude.value.toFixed(4)}, ${longitude.value.toFixed(4)}`
+          // Keep the GPS coordinates when the reverse-geocoding service is unavailable.
         }
       },
       (err) => {
@@ -342,6 +334,15 @@ export const useSignalementStore = defineStore('signalement', () => {
       }
 
       // 4. Insertion dans la table signalements
+      const dateCapturePhoto = new Date(photoFichier.value.lastModified || Date.now())
+      const descriptionAvecDate = [
+        description.value?.trim(),
+        `Photo capturée le ${new Intl.DateTimeFormat('fr-BI', {
+          dateStyle: 'medium',
+          timeStyle: 'short'
+        }).format(dateCapturePhoto)}`
+      ].filter(Boolean).join(' | ')
+
       const { data: signalementCree, error: insertError } = await supabase
         .from('signalements')
         .insert({
@@ -350,7 +351,7 @@ export const useSignalementStore = defineStore('signalement', () => {
           photo_avant_url: photoUrl,
           latitude: Number(latitude.value),
           longitude: Number(longitude.value),
-          description: description.value ? description.value.trim() : null,
+          description: descriptionAvecDate,
           statut: 'en_attente'
         })
         .select()

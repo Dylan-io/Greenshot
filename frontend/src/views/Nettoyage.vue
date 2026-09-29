@@ -62,7 +62,7 @@
     </div>
 
     <!-- Contenu principal du nettoyage -->
-    <main v-else class="nettoyage-main-content">
+    <main v-else-if="signalement" class="nettoyage-main-content">
       
       <!-- 2. COMPARAISON AVANT / APRÈS -->
       <section class="comparison-section">
@@ -70,21 +70,45 @@
 
         <div class="comparison-grid">
           
-          <!-- Colonne AVANT (Photo déjà existante récupérée depuis Supabase) -->
+          <!-- Capture AVANT le nettoyage -->
           <div class="photo-column before-col">
             <div class="column-header">
-              <span class="step-tag before-tag">📸 Avant</span>
+              <span class="step-tag before-tag">📸 Avant nettoyage *</span>
               <span class="cat-badge">{{ signalement?.categories?.nom || 'Déchet' }}</span>
             </div>
-            
-            <div class="photo-box">
-              <img 
-                :src="signalement?.photo_avant_url || 'https://images.unsplash.com/photo-1605600659873-d808a13e4d2a?w=600'" 
-                alt="Photo initiale avant nettoyage" 
-                class="photo-img"
-              />
+
+            <div v-if="cameraOuverte && captureActive === 'avant'" class="camera-capture-panel">
+              <video ref="videoElement" class="camera-video" autoplay playsinline muted></video>
+              <div class="camera-actions">
+                <button type="button" class="btn-camera-capture" :disabled="!cameraPrete" @click="prendrePhoto">
+                  Capturer avant
+                </button>
+                <button type="button" class="btn-camera-cancel" @click="fermerCamera">Annuler</button>
+              </div>
             </div>
-            <small class="photo-caption">📍 {{ signalement?.ville || 'Bujumbura' }}</small>
+
+            <div v-else-if="photoAvantPreview" class="photo-box has-preview">
+              <img :src="photoAvantPreview" alt="Photo capturée avant le nettoyage" class="photo-img" />
+              <div class="photo-overlay">
+                <span class="ready-badge">✓ Avant prête</span>
+                <button type="button" class="btn-change-photo" @click="ouvrirCamera('avant')">Reprendre</button>
+              </div>
+            </div>
+
+            <button v-else type="button" class="upload-dropzone-after" @click="ouvrirCamera('avant')" :disabled="chargementInitial">
+              <div class="camera-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="camera-svg">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              </div>
+              <span class="upload-label">Prendre la photo Avant</span>
+              <small class="upload-hint">Caméra directe · GPS capturé à la prise</small>
+            </button>
+
+            <small v-if="photoAvantGps" class="photo-caption">
+              📍 GPS avant : {{ photoAvantGps.latitude.toFixed(5) }}, {{ photoAvantGps.longitude.toFixed(5) }} · {{ formaterDateHeure(photoAvantGps.capturedAt) }}
+            </small>
           </div>
 
           <!-- Colonne APRÈS (Zone d'upload / prise de photo citoyenne) -->
@@ -95,26 +119,27 @@
             </div>
 
             <!-- Si photo sélectionnée : Aperçu avec actions -->
-            <div v-if="photoApresPreview" class="photo-box has-preview">
+            <div v-if="cameraOuverte && captureActive === 'apres'" class="camera-capture-panel">
+              <video ref="videoElement" class="camera-video" autoplay playsinline muted></video>
+              <div class="camera-actions">
+                <button type="button" class="btn-camera-capture" :disabled="!cameraPrete" @click="prendrePhoto">
+                  Capturer après
+                </button>
+                <button type="button" class="btn-camera-cancel" @click="fermerCamera">Annuler</button>
+              </div>
+            </div>
+
+            <div v-else-if="photoApresPreview" class="photo-box has-preview">
               <img :src="photoApresPreview" alt="Aperçu photo après nettoyage" class="photo-img" />
               <div class="photo-overlay">
                 <span class="ready-badge">✓ Prête ({{ photoApresTaille }} Ko)</span>
-                <button type="button" class="btn-change-photo" @click="ouvrirSelecteurPhoto">
-                  Changer
+                <button type="button" class="btn-change-photo" @click="ouvrirCamera('apres')">
+                  Reprendre
                 </button>
               </div>
             </div>
 
-            <!-- Si vide : Zone de sélection tactile -->
-            <div 
-              v-else 
-              class="upload-dropzone-after"
-              @click="ouvrirSelecteurPhoto"
-              role="button"
-              tabindex="0"
-              aria-label="Prendre la photo après nettoyage"
-              @keydown.enter="ouvrirSelecteurPhoto"
-            >
+            <button v-else type="button" class="upload-dropzone-after" @click="ouvrirCamera('apres')" :disabled="!photoAvantFichier">
               <div class="camera-icon-wrap">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="camera-svg">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -122,18 +147,11 @@
                 </svg>
               </div>
               <span class="upload-label">Prendre la photo Après</span>
-              <small class="upload-hint">Appareil photo · Compression auto &lt; 1 Mo</small>
-            </div>
-
-            <input 
-              ref="inputPhotoApres"
-              type="file" 
-              accept="image/*" 
-              capture="environment" 
-              class="hidden-file-input"
-              @change="gererPhotoApres"
-              id="photo-apres-input"
-            />
+              <small class="upload-hint">Caméra directe · GPS capturé à la prise</small>
+            </button>
+            <small v-if="photoApresGps" class="photo-caption">
+              📍 GPS après : {{ photoApresGps.latitude.toFixed(5) }}, {{ photoApresGps.longitude.toFixed(5) }} · {{ formaterDateHeure(photoApresGps.capturedAt) }}
+            </small>
           </div>
 
         </div>
@@ -143,14 +161,7 @@
       <section class="geoloc-verification-section">
         <div class="geoloc-header">
           <h2 class="section-title">Contrôle géographique de présence</h2>
-          <button 
-            type="button" 
-            class="btn-refresh-gps" 
-            @click="verifierPositionGps(false)"
-            :disabled="gpsEnCours"
-          >
-            {{ gpsEnCours ? '🛰️ Analyse...' : '🔄 Actualiser GPS' }}
-          </button>
+          <span class="gps-radius-label">Rayon requis : 50 m</span>
         </div>
 
         <!-- État : Analyse GPS en cours -->
@@ -158,28 +169,28 @@
           <div class="spinner-gps"></div>
           <div class="geoloc-text">
             <strong>Vérification satellite en cours...</strong>
-            <p>Calcul de la distance entre votre téléphone et le lieu du déchet.</p>
+            <p>Vérification GPS des deux photos autour du lieu signalé.</p>
           </div>
         </div>
 
         <!-- État 1 : Position Validée (< 50 mètres) -->
-        <div v-else-if="statutDistance === 'valide'" class="geoloc-banner success">
+        <div v-else-if="photosGpsValides" class="geoloc-banner success">
           <div class="geoloc-icon">✅</div>
           <div class="geoloc-text">
-            <strong class="success-headline">Position vérifiée · à {{ distanceMetres }}m du signalement</strong>
-            <p>Vous êtes bien sur les lieux (rayon &lt; 50m respecté). Preuve prête à être certifiée.</p>
+            <strong class="success-headline">Positions des deux photos vérifiées</strong>
+            <p>Avant : {{ formaterDistance(distanceAvantMetres) }} · Après : {{ formaterDistance(distanceApresMetres) }} du signalement.</p>
           </div>
         </div>
 
         <!-- État 2 : Trop loin (>= 50 mètres) -->
-        <div v-else-if="statutDistance === 'trop_loin'" class="geoloc-banner warning">
+        <div v-else-if="distanceAvantMetres !== null || distanceApresMetres !== null" class="geoloc-banner warning">
           <div class="geoloc-icon">❌</div>
           <div class="geoloc-text">
             <strong class="warning-headline">
-              Tu sembles être à {{ formaterDistance(distanceMetres) }} du signalement
+              Une position GPS est hors du rayon autorisé
             </strong>
             <p>
-              Rapproche-toi pour confirmer le nettoyage. La règle anti-fraude Greenshot exige d'être à moins de 50 m du déchet.
+              Reprends chaque photo sur place. Les deux positions doivent être à moins de 50 m du signalement.
             </p>
           </div>
         </div>
@@ -190,42 +201,10 @@
           <div class="geoloc-text">
             <strong>Position GPS requise</strong>
             <p>{{ erreurGpsMessage || "Activez le GPS de votre appareil pour valider votre présence sur place." }}</p>
-            <button type="button" class="btn-retry-gps" @click="verifierPositionGps(false)">
-              🛰️ Activer ma position
-            </button>
+            <small>Reprenez la photo concernée pour obtenir une nouvelle position GPS liée à cette capture.</small>
           </div>
         </div>
 
-        <!-- Outil de simulation pédagogique pour test / bailleurs de fonds -->
-        <div class="demo-test-switch">
-          <span class="test-label">🧪 Test & Démonstration :</span>
-          <div class="test-options">
-            <button 
-              type="button" 
-              class="test-btn" 
-              :class="{ 'active': modeSimulation === 'sur_place' }"
-              @click="simulerPresence(true)"
-            >
-              Simuler sur place (12 m)
-            </button>
-            <button 
-              type="button" 
-              class="test-btn" 
-              :class="{ 'active': modeSimulation === 'trop_loin' }"
-              @click="simulerPresence(false)"
-            >
-              Simuler trop loin (180 m)
-            </button>
-            <button 
-              type="button" 
-              class="test-btn" 
-              :class="{ 'active': modeSimulation === 'reel' }"
-              @click="verifierPositionGps(false)"
-            >
-              GPS réel
-            </button>
-          </div>
-        </div>
       </section>
 
       <!-- 4. BOUTON D'ACTION & ENVOI -->
@@ -247,11 +226,11 @@
             <span class="spinner-white"></span>
             Validation en cours...
           </template>
-          <template v-else-if="!photoApresFichier">
-            Prenez la photo après nettoyage
+          <template v-else-if="!photoAvantFichier || !photoApresFichier">
+            Prenez les photos avant et après
           </template>
-          <template v-else-if="statutDistance !== 'valide'">
-            Rapprochez-vous du lieu (&lt; 50m)
+          <template v-else-if="!photosGpsValides">
+            GPS des deux photos requis (&lt; 50 m)
           </template>
           <template v-else>
             <span class="btn-inner">
@@ -262,17 +241,22 @@
         </button>
 
         <p v-if="!peutConfirmer && !envoiEnCours" class="footer-hint">
-          Une photo après + votre présence à moins de 50 m sont requises pour créditer vos points.
+          Deux photos caméra et leurs positions GPS à moins de 50 m sont requises pour créditer vos points.
         </p>
       </footer>
 
     </main>
 
+    <section v-else class="loading-box error-state" role="alert">
+      <strong>Nettoyage indisponible</strong>
+      <span>{{ messageErreurSoumission || 'Le signalement réel n’a pas pu être chargé.' }}</span>
+    </section>
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase, supabaseConfigured } from '../services/supabaseClient'
 import { useUserStore } from '../stores/userStore'
@@ -282,25 +266,31 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-const inputPhotoApres = ref(null)
+const videoElement = ref(null)
+const cameraOuverte = ref(false)
+const cameraPrete = ref(false)
+const captureActive = ref('')
+let cameraStream = null
 
 // Signalement cible
 const signalement = ref(null)
 const chargementInitial = ref(true)
 
-// Photo Après
+// Photos avant/après et positions GPS capturées au même instant
+const photoAvantFichier = ref(null)
+const photoAvantPreview = ref(null)
+const photoAvantTaille = ref(0)
+const photoAvantGps = ref(null)
 const photoApresFichier = ref(null)
 const photoApresPreview = ref(null)
 const photoApresTaille = ref(0)
+const photoApresGps = ref(null)
 
 // Géolocalisation & Anti-fraude
-const userLatitude = ref(null)
-const userLongitude = ref(null)
-const distanceMetres = ref(null)
 const gpsEnCours = ref(false)
 const erreurGpsMessage = ref('')
-const statutDistance = ref('inconnu') // 'valide' | 'trop_loin' | 'erreur' | 'inconnu'
-const modeSimulation = ref('reel') // 'reel' | 'sur_place' | 'trop_loin'
+const distanceAvantMetres = ref(null)
+const distanceApresMetres = ref(null)
 
 // Soumission
 const envoiEnCours = ref(false)
@@ -309,7 +299,7 @@ const succesAffiche = ref(false)
 const messageErreurSoumission = ref('')
 
 const signalementId = computed(() => {
-  return route.query.id || route.params.id || 'sig-buj-1'
+  return route.query.id || route.params.id || ''
 })
 
 const pointsAGagner = computed(() => {
@@ -317,7 +307,12 @@ const pointsAGagner = computed(() => {
 })
 
 const peutConfirmer = computed(() => {
-  return Boolean(photoApresFichier.value && statutDistance.value === 'valide' && !envoiEnCours.value)
+  return Boolean(signalement.value?.id && photosGpsValides.value && !envoiEnCours.value)
+})
+
+const photosGpsValides = computed(() => {
+  return estDansRayon(photoAvantGps.value, distanceAvantMetres.value) &&
+    estDansRayon(photoApresGps.value, distanceApresMetres.value)
 })
 
 const libelleEnvoi = computed(() => {
@@ -331,42 +326,22 @@ const libelleEnvoi = computed(() => {
 
 onMounted(async () => {
   await chargerSignalementCible()
-  verifierPositionGps(true)
+})
+
+onBeforeUnmount(() => {
+  arreterCamera()
+  if (photoAvantPreview.value) URL.revokeObjectURL(photoAvantPreview.value)
+  if (photoApresPreview.value) URL.revokeObjectURL(photoApresPreview.value)
 })
 
 async function chargerSignalementCible() {
   chargementInitial.value = true
   const idCible = signalementId.value
 
-  // Données de secours réalistes Greenshot
-  const DEMO_ITEMS = {
-    'sig-buj-1': {
-      id: 'sig-buj-1',
-      latitude: -3.3862,
-      longitude: 29.3621,
-      ville: 'Bujumbura (Rohero)',
-      photo_avant_url: 'https://images.unsplash.com/photo-1605600659873-d808a13e4d2a?w=600',
-      statut: 'en_attente',
-      categories: { nom: 'Déchets plastiques', points_nettoyage: 30 }
-    },
-    'sig-buj-2': {
-      id: 'sig-buj-2',
-      latitude: -3.3645,
-      longitude: 29.3730,
-      ville: 'Bujumbura (Buyenzi)',
-      photo_avant_url: 'https://images.unsplash.com/photo-1618477461853-cf6ed80faba5?w=600',
-      statut: 'vu',
-      categories: { nom: 'Décharge sauvage', points_nettoyage: 45 }
-    }
-  }
-
-  if (!supabaseConfigured) {
-    signalement.value = DEMO_ITEMS[idCible] || DEMO_ITEMS['sig-buj-1']
-    chargementInitial.value = false
-    return
-  }
-
   try {
+    if (!supabaseConfigured) throw new Error('Supabase n’est pas configuré.')
+    if (!idCible) throw new Error('Aucun identifiant de signalement réel n’a été fourni.')
+
     const { data, error } = await supabase
       .from('signalements')
       .select('*, categories(nom, points_nettoyage)')
@@ -375,53 +350,128 @@ async function chargerSignalementCible() {
 
     if (error) throw error
 
-    if (data) {
-      signalement.value = data
-    } else {
-      signalement.value = DEMO_ITEMS[idCible] || DEMO_ITEMS['sig-buj-1']
+    if (!data) throw new Error('Signalement introuvable dans Supabase.')
+    if (['nettoye', 'traite'].includes(data.statut)) throw new Error('Ce signalement est déjà nettoyé ou traité.')
+    if (!Number.isFinite(Number(data.latitude)) || !Number.isFinite(Number(data.longitude))) {
+      throw new Error('Le signalement ne possède pas de coordonnées GPS valides.')
     }
+    signalement.value = data
   } catch (err) {
-    console.warn('Erreur chargement signalement à nettoyer, utilisation démo:', err)
-    signalement.value = DEMO_ITEMS[idCible] || DEMO_ITEMS['sig-buj-1']
+    console.error('Erreur chargement signalement à nettoyer:', err)
+    messageErreurSoumission.value = err.message || 'Impossible de charger ce signalement.'
   } finally {
     chargementInitial.value = false
   }
 }
 
-// 2. Gestion de la photo après
-function ouvrirSelecteurPhoto() {
-  if (inputPhotoApres.value) {
-    inputPhotoApres.value.click()
+// 2. Capture directe caméra et GPS au moment de chaque photo
+async function ouvrirCamera(typeCapture) {
+  erreurGpsMessage.value = ''
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    erreurGpsMessage.value = 'La caméra nécessite un navigateur compatible et une connexion HTTPS (ou localhost).'
+    return
+  }
+
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' } }
+    })
+    captureActive.value = typeCapture
+    cameraOuverte.value = true
+    await nextTick()
+    videoElement.value.srcObject = cameraStream
+    await videoElement.value.play()
+    cameraPrete.value = true
+  } catch (error) {
+    arreterCamera()
+    cameraOuverte.value = false
+    erreurGpsMessage.value = error.name === 'NotAllowedError'
+      ? 'Autorisez l’accès à la caméra dans les réglages du navigateur, puis réessayez.'
+      : 'Impossible d’ouvrir la caméra. Vérifiez les permissions et réessayez.'
   }
 }
 
-function gererPhotoApres(e) {
-  const file = e.target.files?.[0]
-  if (!file) return
-
-  if (photoApresPreview.value) {
-    URL.revokeObjectURL(photoApresPreview.value)
-  }
-
-  photoApresFichier.value = file
-  photoApresTaille.value = Math.round(file.size / 1024)
-  photoApresPreview.value = URL.createObjectURL(file)
-
-  // Re-vérifier automatiquement la position GPS lors de la capture photo
-  if (modeSimulation.value === 'reel') {
-    verifierPositionGps(false)
-  }
+function arreterCamera() {
+  cameraStream?.getTracks().forEach((track) => track.stop())
+  cameraStream = null
+  cameraPrete.value = false
 }
 
-// 3. Vérification géographique anti-fraude
-function verifierPositionGps(silencieux = false) {
-  modeSimulation.value = 'reel'
+function fermerCamera() {
+  arreterCamera()
+  cameraOuverte.value = false
+  captureActive.value = ''
+}
+
+function prendrePhoto() {
+  const video = videoElement.value
+  if (!video?.videoWidth || !video.videoHeight || !captureActive.value) return
+
+  const canvas = document.createElement('canvas')
+  canvas.width = video.videoWidth
+  canvas.height = video.videoHeight
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+  const typeCapture = captureActive.value
+  const capturedAt = Date.now()
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      erreurGpsMessage.value = 'La photo n’a pas pu être capturée. Réessayez.'
+      return
+    }
+
+    fermerCamera()
+    const file = new File([blob], `greenshot-${typeCapture}-${capturedAt}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: capturedAt
+    })
+    enregistrerCapture(typeCapture, file, capturedAt)
+  }, 'image/jpeg', 0.92)
+}
+
+function enregistrerCapture(typeCapture, file, capturedAt) {
+  const preview = URL.createObjectURL(file)
+  const photoGps = {
+    latitude: null,
+    longitude: null,
+    precision: null,
+    capturedAt
+  }
+
+  if (typeCapture === 'avant') {
+    if (photoAvantPreview.value) URL.revokeObjectURL(photoAvantPreview.value)
+    photoAvantFichier.value = file
+    photoAvantPreview.value = preview
+    photoAvantTaille.value = Math.round(file.size / 1024)
+    photoAvantGps.value = photoGps
+  } else {
+    if (photoApresPreview.value) URL.revokeObjectURL(photoApresPreview.value)
+    photoApresFichier.value = file
+    photoApresPreview.value = preview
+    photoApresTaille.value = Math.round(file.size / 1024)
+    photoApresGps.value = photoGps
+  }
+
+  verifierPositionGps(typeCapture, photoGps)
+}
+
+function formaterDateHeure(timestamp) {
+  return new Intl.DateTimeFormat('fr-BI', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(timestamp)
+}
+
+// 3. Vérification anti-fraude pour le GPS de la capture courante
+function verifierPositionGps(typeCapture, photoGps) {
   gpsEnCours.value = true
   erreurGpsMessage.value = ''
 
   if (!('geolocation' in navigator)) {
     gpsEnCours.value = false
-    statutDistance.value = 'erreur'
+    photoGps.error = true
     erreurGpsMessage.value = "La géolocalisation n'est pas supportée par votre navigateur."
     return
   }
@@ -429,70 +479,46 @@ function verifierPositionGps(silencieux = false) {
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       gpsEnCours.value = false
-      userLatitude.value = pos.coords.latitude
-      userLongitude.value = pos.coords.longitude
+      photoGps.latitude = pos.coords.latitude
+      photoGps.longitude = pos.coords.longitude
+      photoGps.precision = Math.round(pos.coords.accuracy || 0)
 
-      analyserDistance(userLatitude.value, userLongitude.value)
+      const distance = calculerHaversine(
+        photoGps.latitude,
+        photoGps.longitude,
+        Number(signalement.value.latitude),
+        Number(signalement.value.longitude)
+      )
+      if (typeCapture === 'avant') distanceAvantMetres.value = distance
+      else distanceApresMetres.value = distance
+
+      if (distance > 50) {
+        erreurGpsMessage.value = `La photo ${typeCapture} a été capturée à ${formaterDistance(distance)} du signalement. La limite est de 50 m.`
+      }
     },
     (err) => {
       gpsEnCours.value = false
       console.warn('Erreur GPS nettoyage:', err)
-      statutDistance.value = 'erreur'
+      photoGps.error = true
       if (err.code === 1) {
         erreurGpsMessage.value = "L'accès GPS a été refusé. Il est indispensable pour certifier votre présence sur le lieu."
       } else {
         erreurGpsMessage.value = "Impossible de capter votre signal satellite. Rapprochez-vous d'une zone dégagée."
       }
-
-      // En mode développement / premier test sans GPS fixe, simuler pour ne pas bloquer
-      if (silencieux) {
-        simulerPresence(true)
-      }
     },
-    { enableHighAccuracy: true, timeout: 8000 }
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   )
 }
 
-function analyserDistance(uLat, uLng) {
-  if (!signalement.value?.latitude || !signalement.value?.longitude) {
-    statutDistance.value = 'valide'
-    distanceMetres.value = 15
-    return
-  }
-
-  const sLat = Number(signalement.value.latitude)
-  const sLng = Number(signalement.value.longitude)
-  const dist = calculerHaversine(uLat, uLng, sLat, sLng)
-
-  distanceMetres.value = dist
-
-  if (dist <= 50) {
-    statutDistance.value = 'valide'
-  } else {
-    statutDistance.value = 'trop_loin'
-  }
-}
-
-function simulerPresence(surPlace) {
-  if (!signalement.value) return
-  const sLat = Number(signalement.value.latitude || -3.3822)
-  const sLng = Number(signalement.value.longitude || 29.3644)
-
-  if (surPlace) {
-    // Coordonnées à ~12 mètres du signalement
-    modeSimulation.value = 'sur_place'
-    userLatitude.value = sLat + 0.0001
-    userLongitude.value = sLng + 0.00008
-    distanceMetres.value = 12
-    statutDistance.value = 'valide'
-  } else {
-    // Coordonnées à ~180 mètres (trop loin)
-    modeSimulation.value = 'trop_loin'
-    userLatitude.value = sLat + 0.0016
-    userLongitude.value = sLng + 0.0012
-    distanceMetres.value = 180
-    statutDistance.value = 'trop_loin'
-  }
+function estDansRayon(photoGps, distance) {
+  return Boolean(
+    photoGps &&
+    Number.isFinite(photoGps.latitude) &&
+    Number.isFinite(photoGps.longitude) &&
+    !photoGps.error &&
+    distance !== null &&
+    distance <= 50
+  )
 }
 
 function calculerHaversine(lat1, lon1, lat2, lon2) {
@@ -522,7 +548,19 @@ async function confirmerNettoyage() {
   messageErreurSoumission.value = ''
 
   try {
-    // 1. Compression obligatoire < 1 Mo (contexte data Burundi)
+    let nettoyeurId = userStore.user?.id
+    if (!nettoyeurId) {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+      nettoyeurId = sessionData.session?.user?.id
+    }
+    if (!nettoyeurId) {
+      const { data: anonymousData, error: anonymousError } = await supabase.auth.signInAnonymously()
+      if (anonymousError) throw new Error('Connectez-vous ou activez l’authentification anonyme pour soumettre la preuve.')
+      nettoyeurId = anonymousData.user?.id
+    }
+    if (!nettoyeurId) throw new Error('Session Supabase introuvable. Connectez-vous avant de soumettre le nettoyage.')
+
     etapeEnvoi.value = 'compression'
     const options = {
       maxSizeMB: 1.0,
@@ -532,67 +570,35 @@ async function confirmerNettoyage() {
     }
     const photoCompressee = await imageCompression(photoApresFichier.value, options)
 
-    // 2. Upload vers Supabase Storage
     etapeEnvoi.value = 'upload'
-    let urlPhotoApres = 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800'
-    const nomFichier = `nettoyage_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`
+    const nomFichierApres = `nettoyage-apres-${Date.now()}-${crypto.randomUUID()}.jpg`
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('signalements-photos')
+      .upload(nomFichierApres, photoCompressee)
+    if (uploadError || !uploadData) throw uploadError || new Error('Le téléversement de la photo après a échoué.')
 
-    const buckets = ['photos-signalements', 'signalements-photos']
-    for (const b of buckets) {
-      try {
-        const { data: upData, error: upErr } = await supabase.storage
-          .from(b)
-          .upload(nomFichier, photoCompressee)
+    const { data: urlApres } = supabase.storage
+      .from('signalements-photos')
+      .getPublicUrl(nomFichierApres)
+    if (!urlApres?.publicUrl) throw new Error('Impossible de récupérer l’URL de la photo après nettoyage.')
 
-        if (!upErr && upData) {
-          const { data: pubData } = supabase.storage.from(b).getPublicUrl(nomFichier)
-          if (pubData?.publicUrl) {
-            urlPhotoApres = pubData.publicUrl
-            break
-          }
-        }
-      } catch (err) {
-        console.warn(`Erreur bucket ${b}:`, err)
-      }
-    }
-
-    // 3. Déterminer l'ID du nettoyeur
+    // La RPC vérifie côté serveur que le GPS après est à moins de 50 m.
     etapeEnvoi.value = 'mise_a_jour'
-    const monId = userStore.user?.id || userStore.profile?.id || 'usr-7'
+    const { data: rpcData, error: rpcError } = await supabase.rpc('soumettre_preuve_nettoyage', {
+      p_signalement_id: signalement.value.id,
+      p_photo_apres_url: urlApres.publicUrl,
+      p_latitude: photoApresGps.value.latitude,
+      p_longitude: photoApresGps.value.longitude
+    })
 
-    // 4. Appel RPC ou mise à jour directe dans Supabase
-    let majReussie = false
-    try {
-      const { data: rpcData, error: rpcError } = await supabase.rpc('soumettre_preuve_nettoyage', {
-        p_signalement_id: signalement.value.id,
-        p_photo_apres_url: urlPhotoApres,
-        p_latitude: Number(userLatitude.value || signalement.value.latitude),
-        p_longitude: Number(userLongitude.value || signalement.value.longitude)
-      })
+    if (rpcError) throw rpcError
+    if (!rpcData?.success) throw new Error(rpcData?.message || 'La validation anti-fraude a refusé cette preuve.')
 
-      if (!rpcError && rpcData?.success) {
-        majReussie = true
-      }
-    } catch {
-      // Si la RPC n'est pas encore créée, fallback mise à jour directe
-    }
-
-    if (!majReussie) {
-      await supabase
-        .from('signalements')
-        .update({
-          photo_apres_url: urlPhotoApres,
-          nettoye_par_user_id: monId,
-          date_nettoyage: new Date().toISOString(),
-          statut: 'nettoye'
-        })
-        .eq('id', signalement.value.id)
-    }
-
-    // 5. Créditer le profil local
+    // Le RPC a déjà crédité le profil en base.
     if (userStore.profile) {
-      userStore.profile.score_nettoyage = (userStore.profile.score_nettoyage || 0) + pointsAGagner.value
-      userStore.profile.score_total = (userStore.profile.score_total || 0) + pointsAGagner.value
+      const pointsGagnes = Number(rpcData.points_gagnes) || pointsAGagner.value
+      userStore.profile.score_nettoyage = (userStore.profile.score_nettoyage || 0) + pointsGagnes
+      userStore.profile.score_total = (userStore.profile.score_total || 0) + pointsGagnes
     }
 
     etapeEnvoi.value = 'termine'
@@ -821,6 +827,76 @@ function retourAuSignalement() {
   cursor: pointer;
   transition: all 0.2s ease;
   -webkit-tap-highlight-color: transparent;
+}
+
+.upload-dropzone-after:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.camera-capture-panel {
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 12px;
+  background: #0f172a;
+}
+
+.camera-video {
+  display: block;
+  width: 100%;
+  height: calc(100% - 54px);
+  object-fit: cover;
+}
+
+.camera-actions {
+  display: flex;
+  gap: 0.5rem;
+  height: 54px;
+  padding: 0.35rem;
+  background: white;
+}
+
+.btn-camera-capture,
+.btn-camera-cancel {
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-camera-capture {
+  flex: 1;
+  border: 0;
+  background: var(--color-primary, #1f4d3a);
+  color: white;
+}
+
+.btn-camera-capture:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.btn-camera-cancel {
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: white;
+  color: var(--color-text, #0f172a);
+}
+
+.gps-radius-label {
+  color: var(--color-text-muted, #64748b);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.error-state {
+  align-items: flex-start;
+  flex-direction: column;
+  color: var(--color-terracotta, #b5502f);
 }
 
 .upload-dropzone-after:hover,

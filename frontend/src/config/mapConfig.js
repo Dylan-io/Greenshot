@@ -1,23 +1,37 @@
-// Configuration Cartographique Greenshot (Leaflet + CARTO Basemaps)
+// Configuration cartographique Greenshot (Leaflet + OpenStreetMap)
 import pinEnAttente from '../assets/map-icons/pin-en-attente.svg'
 import pinVu from '../assets/map-icons/pin-vu.svg'
 import pinNettoye from '../assets/map-icons/pin-nettoye.svg'
 import pinTraite from '../assets/map-icons/pin-traite.svg'
 
 export const MAP_CONFIG = {
-  // Centre par défaut : Bujumbura, Burundi
-  defaultCenter: [-3.3822, 29.3644],
-  defaultZoom: 12,
-  minZoom: 7,
+  // Vue initiale à l'échelle du Burundi
+  defaultCenter: [-3.37, 29.92],
+  defaultZoom: 8,
+  minZoom: 6,
   maxZoom: 19,
+  burundiBounds: [[-4.7, 28.8], [-2.1, 31.05]],
 
-  // Fournisseurs de tuiles CARTO Voyager (Clair, gratuit, sans clé API)
+  // Fond public sans clé API; conserver l'attribution visible
   tileLayers: {
+    openStreetMap: {
+      name: 'OpenStreetMap',
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+    },
     voyager: {
       name: 'CARTO Voyager (Clair)',
       url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
     }
+  },
+
+  categoryConfig: {
+    'Déchets plastiques': { label: 'Déchets plastiques', icon: '♻', color: '#2563eb' },
+    'Décharge sauvage': { label: 'Décharge sauvage', icon: '▤', color: '#c2410c' },
+    'Pollution eau': { label: 'Pollution de l’eau', icon: '●', color: '#0891b2' },
+    'Déforestation': { label: 'Déforestation', icon: '♣', color: '#15803d' },
+    'Autre': { label: 'Autre problème', icon: '•', color: '#475569' }
   },
 
   // Configuration des 4 statuts Greenshot
@@ -63,6 +77,13 @@ export function normaliserStatut(statut) {
     return s
   }
   return 'en_attente'
+}
+
+export function normaliserCategorie(nom) {
+  const categorie = Object.keys(MAP_CONFIG.categoryConfig).find((key) => {
+    return key.toLocaleLowerCase('fr') === String(nom || '').trim().toLocaleLowerCase('fr')
+  })
+  return categorie || 'Autre'
 }
 
 /**
