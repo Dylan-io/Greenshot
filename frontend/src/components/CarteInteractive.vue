@@ -46,7 +46,7 @@
     <!-- Fiche Flottante en Bas d'Écran (Bottom Sheet) au clic sur une épingle -->
     <transition name="slide-up">
       <div v-if="selectedSignalement" class="bottom-sheet-card" role="dialog" aria-modal="true">
-        <button type="button" class="btn-close-sheet" @click="fermerFiche" aria-label="Fermer">✕</button>
+        <button type="button" class="btn-close-sheet" @click="fermerFiche" aria-label="Fermer"><Icone nom="fermer" /></button>
 
         <div class="sheet-content">
           <!-- Vignette photo -->
@@ -76,7 +76,7 @@
 
               <!-- Distance approximative depuis l'utilisateur -->
               <span v-if="distanceUtilisateur" class="sheet-distance">
-                📍 À {{ distanceUtilisateur }}
+                <Icone nom="localisation" /> À {{ distanceUtilisateur }}
               </span>
             </div>
 
@@ -93,7 +93,7 @@
                 class="btn-voir-detail" 
                 @click="allerAuDetail(selectedSignalement.id)"
               >
-                Voir le détail →
+                Voir le détail <Icone nom="fleche_droite" />
               </button>
             </div>
           </div>
@@ -109,6 +109,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import L from 'leaflet'
 import { MAP_CONFIG, normaliserCategorie, normaliserStatut, calculerDistance } from '../config/mapConfig'
+import Icone from './Icone.vue'
 
 const props = defineProps({
   signalements: {
@@ -561,6 +562,9 @@ function formaterDate(dateStr) {
 }
 
 .sheet-distance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--color-primary, #1F4D3A);
@@ -593,6 +597,9 @@ function formaterDate(dateStr) {
 }
 
 .btn-voir-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   background-color: var(--color-primary, #1F4D3A);
   color: #FFFFFF;
   border: none;

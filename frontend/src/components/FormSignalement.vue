@@ -4,7 +4,7 @@
     <!-- Toast / Notification de succès -->
     <transition name="fade">
       <div v-if="succesAffiche" class="succes-banner" role="alert">
-        <div class="succes-icon">🎉</div>
+        <div class="succes-icon"><Icone nom="celebration" /></div>
         <div class="succes-content">
           <h3 class="succes-title">Signalement envoyé avec succès !</h3>
           <p class="succes-desc">
@@ -19,7 +19,9 @@
     <!-- Bannière d'erreur réseau / soumission -->
     <transition name="fade">
       <div v-if="store.messageErreurEnvoi" class="erreur-banner" role="alert">
-        <div class="erreur-icon">{{ store.estErreurReseau ? '📡' : '⚠️' }}</div>
+        <div class="erreur-icon">
+      <Icone :nom="store.estErreurReseau ? 'navigation' : 'alerte'" />
+    </div>
         <div class="erreur-content">
           <h4 class="erreur-title">
             {{ store.estErreurReseau ? 'Connexion réseau instable' : 'Erreur lors de l\'envoi' }}
@@ -31,7 +33,7 @@
             @click="declencherEnvoi"
             :disabled="store.envoiEnCours"
           >
-            🔄 Réessayer l'envoi
+            <Icone nom="rafraichir" /> Réessayer l'envoi
           </button>
         </div>
       </div>
@@ -62,14 +64,14 @@
           
           <div class="photo-overlay">
             <span class="photo-info-badge">
-              ✓ Photo prête <span v-if="store.photoTailleOriginale">({{ store.photoTailleOriginale }} Ko)</span>
+              <Icone nom="coherent" /> Photo prête <span v-if="store.photoTailleOriginale">({{ store.photoTailleOriginale }} Ko)</span>
             </span>
             <div class="photo-actions">
               <button type="button" class="btn-photo-action" @click="ouvrirCamera" :disabled="cameraOuverte">
-                📷 Reprendre
+                <Icone nom="appareil_photo" /> Reprendre
               </button>
               <button type="button" class="btn-photo-action btn-danger" @click="supprimerPhotoCapturee">
-                🗑️ Supprimer
+                <Icone nom="dechet" /> Supprimer
               </button>
             </div>
           </div>
@@ -112,7 +114,7 @@
 
         <!-- État : GPS capturé avec succès -->
         <div v-else-if="store.statutGps === 'succes'" class="gps-card gps-success">
-          <div class="gps-icon-circle">📍</div>
+          <div class="gps-icon-circle"><Icone nom="localisation" /></div>
           <div class="gps-text">
             <div class="gps-headline">
               <strong>{{ store.zoneDetectee }}</strong>
@@ -130,13 +132,13 @@
             @click="store.capturerGeolocalisation" 
             title="Rafraîchir les coordonnées"
           >
-            🔄
+            <Icone nom="rafraichir" />
           </button>
         </div>
 
         <!-- État : GPS refusé ou erreur -->
         <div v-else class="gps-card gps-warning">
-          <div class="gps-icon-circle-warning">⚠️</div>
+          <div class="gps-icon-circle-warning"><Icone nom="alerte" /></div>
           <div class="gps-text">
             <strong>Position GPS requise</strong>
             <p class="gps-warning-desc">
@@ -147,7 +149,7 @@
               class="btn-activer-gps" 
               @click="store.capturerGeolocalisation"
             >
-              🛰️ Activer ma position GPS
+              <Icone nom="navigation" /> Activer ma position GPS
             </button>
           </div>
         </div>
@@ -172,7 +174,7 @@
             :class="{ 'chip-selected': store.categorieId === cat.id }"
             @click="store.selectionnerCategorie(cat.id)"
           >
-            <span class="chip-icone">{{ cat.icone }}</span>
+            <span class="chip-icone"><Icone :nom="cat.icone" /></span>
             <span class="chip-nom">{{ cat.nom }}</span>
             <span class="chip-points">+{{ cat.points_signalement || 10 }} pts</span>
           </button>
@@ -249,6 +251,7 @@ import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSignalementStore } from '../stores/signalementStore'
 import { useUserStore } from '../stores/userStore'
+import Icone from './Icone.vue'
 
 const router = useRouter()
 const store = useSignalementStore()
@@ -634,6 +637,9 @@ async function declencherEnvoi() {
 }
 
 .btn-photo-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   background: rgba(255, 255, 255, 0.9);
   border: none;
   border-radius: var(--radius-sm, 8px);
@@ -686,6 +692,7 @@ async function declencherEnvoi() {
 }
 
 .gps-icon-circle {
+  justify-content: center;
   font-size: 1.3rem;
   flex-shrink: 0;
 }
@@ -747,6 +754,8 @@ async function declencherEnvoi() {
 }
 
 .gps-icon-circle-warning {
+  display: flex;
+  justify-content: center;
   font-size: 1.25rem;
 }
 
@@ -757,6 +766,9 @@ async function declencherEnvoi() {
 }
 
 .btn-activer-gps {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   margin-top: 0.4rem;
   background: var(--color-terracotta, #B5502F);
   color: #ffffff;
@@ -811,6 +823,9 @@ async function declencherEnvoi() {
 }
 
 .chip-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.05rem;
 }
 
@@ -986,6 +1001,9 @@ async function declencherEnvoi() {
 }
 
 .succes-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.8rem;
   flex-shrink: 0;
 }
@@ -1022,6 +1040,9 @@ async function declencherEnvoi() {
 }
 
 .erreur-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.4rem;
   flex-shrink: 0;
 }
@@ -1041,6 +1062,9 @@ async function declencherEnvoi() {
 }
 
 .btn-reessayer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   background: #DC2626;
   color: #ffffff;
   border: none;

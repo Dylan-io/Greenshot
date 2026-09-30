@@ -46,7 +46,7 @@
         </div>
 
         <div v-if="gpsCoordonnees" class="gps-card gps-success">
-          <div class="gps-icon-circle">📍</div>
+          <div class="gps-icon-circle"><Icone nom="localisation" /></div>
           <div class="gps-text">
             <div class="gps-headline">
               <strong>{{ ville || 'Ville non identifiée' }}<template v-if="quartier"> ({{ quartier }})</template></strong>
@@ -65,7 +65,7 @@
         </div>
 
         <div v-else class="gps-card gps-warning">
-          <div class="gps-icon-circle-warning">⚠️</div>
+          <div class="gps-icon-circle-warning"><Icone nom="alerte" /></div>
           <div class="gps-text">
             <strong>Position GPS requise après la photo</strong>
             <button type="button" class="btn-activer-gps" @click="analyserPhoto" :disabled="!photoFichier || generationEnCours">
@@ -84,7 +84,7 @@
         <p class="section-subtitle">L’IA choisit parmi les mêmes catégories que le signalement manuel.</p>
         <div v-if="categorieSelectionnee" class="chips-container detected-category-chips" aria-live="polite">
           <div class="chip-item chip-selected" aria-label="Catégorie sélectionnée par l’analyse IA">
-            <span class="chip-icone">{{ categorieSelectionnee.icone }}</span>
+            <span class="chip-icone"><Icone :nom="categorieSelectionnee.icone" /></span>
             <span class="chip-nom">{{ categorieSelectionnee.nom }}</span>
             <span class="chip-points">+{{ categorieSelectionnee.points_signalement || 10 }} pts</span>
           </div>
@@ -146,9 +146,11 @@ import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../services/supabaseClient'
 import { rechercherAdresse } from '../services/geocodage'
+import { analyserImageAvecIA, iaDisponible } from '../services/analyseIA'
 import { useSignalementStore } from '../stores/signalementStore'
 import { useUserStore } from '../stores/userStore'
 import imageCompression from 'browser-image-compression'
+import Icone from './Icone.vue'
 
 const router = useRouter()
 const signalementStore = useSignalementStore()
@@ -348,8 +350,9 @@ async function analyserPhoto() {
     await trouverAdresse(gpsCoordonnees.value)
     adresseEnCours.value = false
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-    if (!apiKey) throw new Error('Clé Gemini absente. Ajoutez VITE_GEMINI_API_KEY dans frontend/.env puis relancez Vite.')
+    if (!iaDisponible()) {
+      throw new Error('Aucune clé API IA configurée. Ajoutez VITE_GROQ_API_KEY (recommandé) ou VITE_GEMINI_API_KEY dans frontend/.env puis relancez Vite.')
+    }
 
     const photoAnalyse = await imageCompression(photoFichier.value, {
       maxSizeMB: 0.35,
@@ -372,66 +375,22 @@ async function analyserPhoto() {
     const contexte = `Ville : ${ville.value}. Quartier : ${quartierContexte}. GPS : ${gpsCoordonnees.value.lat}, ${gpsCoordonnees.value.lng}. Date/heure de la photo : ${formatDateTime(photoMetadata.value.takenAt)}. Catégories de problème disponibles : ${nomsCategories.join(', ')}.`
     const prompt = `Tu es l’assistant de rédaction et de tri des déchets de Greenshot, une application citoyenne au Burundi. Analyse l’image jointe et propose un signalement que l’utilisateur pourra modifier puis confirmer.\n${contexte}\n\nConsignes impératives :\n- Choisis exactement une catégorie de problème dans cette liste : ${nomsCategories.join(', ')}. Choisis-la selon les éléments visibles. N’invente ni matière, ni quantité, ni danger, ni cause, ni action déjà réalisée. Si aucune catégorie précise ne correspond, choisis « Autre » si cette option existe.\n- Propose en français une description concise, neutre, de 1 à 3 phrases. Elle doit décrire les éléments visibles sans prétendre à une certitude absolue.\n- Classe le déchet dans une seule catégorie de tri : recyclable (matière identifiable comme papier, verre, métal ou plastique recyclable), biodegradable (déchet organique/compostable), ou non_recyclable (déchet mixte, contaminé, dangereux ou impossible à identifier avec confiance). En cas de doute, choisis non_recyclable, explique l’incertitude dans reason et baisse confidence.\n- Utilise la ville et le quartier fournis par les données GPS, sans les déduire de l’image. Ne les modifie pas et ne prétends pas les vérifier.\n- Retourne uniquement le JSON demandé par le schéma, sans markdown ni texte autour.`
 
-    const reponse = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
-      },
-      body: JSON.stringify({
-        model: 'gemini-3.8-flash',
-        input: [
-          { type: 'text', text: prompt },
-          { type: 'image', data: imageBase64, mime_type: mimeType }
-        ],
-        response_format: {
-          type: 'text',
-          mime_type: 'application/json',
-          schema: {
-            type: 'object',
-            properties: {
-              categorie: { type: 'string', enum: nomsCategories },
-              description: { type: 'string' },
-              type: { type: 'string', enum: classificationValides },
-              reason: { type: 'string' },
-              confidence: { type: 'integer' }
-            },
-            required: ['categorie', 'description', 'type', 'reason', 'confidence'],
-            additionalProperties: false
-          }
+    // Service IA partagé avec l'écran de nettoyage : Groq d'abord, Gemini en secours
+    const data = await analyserImageAvecIA(prompt, [{ base64: imageBase64, mimeType }], {
+      schema: {
+        type: 'object',
+        properties: {
+          categorie: { type: 'string', enum: nomsCategories },
+          description: { type: 'string' },
+          type: { type: 'string', enum: classificationValides },
+          reason: { type: 'string' },
+          confidence: { type: 'integer' }
         },
-        store: false
-      }),
-      signal: AbortSignal.timeout(45000)
+        required: ['categorie', 'description', 'type', 'reason', 'confidence'],
+        additionalProperties: false
+      }
     })
 
-    if (!reponse.ok) {
-      let detailErreur = ''
-      try {
-        const erreurGemini = await reponse.json()
-        detailErreur = erreurGemini.error?.message || ''
-      } catch {
-        detailErreur = ''
-      }
-
-      const cause = reponse.status === 401 || reponse.status === 403
-        ? 'Clé API refusée ou accès Gemini non autorisé.'
-        : reponse.status === 404
-          ? 'Modèle Gemini introuvable ou indisponible pour cette clé.'
-          : reponse.status === 429
-            ? 'Quota Gemini dépassé ou limite de requêtes atteinte.'
-            : 'Gemini a refusé la requête.'
-      throw new Error(`${cause} (HTTP ${reponse.status})${detailErreur ? ` ${detailErreur.slice(0, 400)}` : ''}`)
-    }
-    const resultatGemini = await reponse.json()
-    const texteEtapes = (resultatGemini.steps || [])
-      .filter((step) => step.type === 'model_output')
-      .flatMap((step) => step.content || [])
-      .filter((content) => content.type === 'text')
-      .map((content) => content.text || '')
-      .join('\n')
-    const texteGenere = resultatGemini.output_text || texteEtapes
-    const data = texteGenere ? JSON.parse(texteGenere) : null
     const categorieResultat = categoriesDisponibles.value.find((category) => category.nom === data?.categorie)
     if (!data || !categorieResultat || !classificationValides.includes(data.type) || !data.description?.trim() || !data.reason?.trim()) {
       throw new Error('La réponse IA est incomplète. Réessayez avec une photo plus claire.')
@@ -929,6 +888,7 @@ async function soumettreSignalement() {
 
 .gps-icon-circle,
 .gps-icon-circle-warning {
+  justify-content: center;
   display: grid;
   place-items: center;
   width: 36px;
@@ -1026,6 +986,9 @@ async function soumettreSignalement() {
 }
 
 .chip-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1rem;
 }
 

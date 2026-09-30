@@ -5,21 +5,22 @@ import { rechercherAdresse } from '../services/geocodage'
 import imageCompression from 'browser-image-compression'
 
 // Catégories de secours avec barème officiel Greenshot Burundi
+// `icone` référence un nom d'icône du composant <Icone> (src/components/Icone.vue)
 const CATEGORIES_SECOURS = [
-  { id: 'cat-plastique', nom: 'Déchets plastiques', points_signalement: 10, points_nettoyage: 30, icone: '🥤' },
-  { id: 'cat-decharge', nom: 'Décharge sauvage', points_signalement: 15, points_nettoyage: 45, icone: '⚠️' },
-  { id: 'cat-eau', nom: 'Pollution eau', points_signalement: 20, points_nettoyage: 50, icone: '💧' },
-  { id: 'cat-foret', nom: 'Déforestation', points_signalement: 20, points_nettoyage: 60, icone: '🌳' },
-  { id: 'cat-autre', nom: 'Autre', points_signalement: 10, points_nettoyage: 25, icone: '📍' }
+  { id: 'cat-plastique', nom: 'Déchets plastiques', points_signalement: 10, points_nettoyage: 30, icone: 'bouteille' },
+  { id: 'cat-decharge', nom: 'Décharge sauvage', points_signalement: 15, points_nettoyage: 45, icone: 'alerte' },
+  { id: 'cat-eau', nom: 'Pollution eau', points_signalement: 20, points_nettoyage: 50, icone: 'goutte' },
+  { id: 'cat-foret', nom: 'Déforestation', points_signalement: 20, points_nettoyage: 60, icone: 'arbre' },
+  { id: 'cat-autre', nom: 'Autre', points_signalement: 10, points_nettoyage: 25, icone: 'localisation' }
 ]
 
 function associerIcone(nom) {
   const nomLower = (nom || '').toLowerCase()
-  if (nomLower.includes('plastique')) return '🥤'
-  if (nomLower.includes('déch') || nomLower.includes('sauvage')) return '⚠️'
-  if (nomLower.includes('eau') || nomLower.includes('rivière') || nomLower.includes('lac')) return '💧'
-  if (nomLower.includes('forêt') || nomLower.includes('arbre')) return '🌳'
-  return '📍'
+  if (nomLower.includes('plastique')) return 'bouteille'
+  if (nomLower.includes('déch') || nomLower.includes('sauvage')) return 'alerte'
+  if (nomLower.includes('eau') || nomLower.includes('rivière') || nomLower.includes('lac')) return 'goutte'
+  if (nomLower.includes('forêt') || nomLower.includes('arbre')) return 'arbre'
+  return 'localisation'
 }
 
 export const useSignalementStore = defineStore('signalement', () => {

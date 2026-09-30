@@ -1,7 +1,7 @@
 <template>
   <div class="page-signalement-ia">
     <RouterLink to="/signaler" class="mode-manuel-link">
-      <span class="back-icon" aria-hidden="true">←</span>
+      <span class="back-icon" aria-hidden="true"><Icone nom="fleche_gauche" /></span>
       <span class="back-copy">
         <strong>Retour au signalement manuel</strong>
         <small>Revenir au parcours classique</small>
@@ -18,6 +18,7 @@
 
 <script setup>
 import FormSignalementIA from '../components/FormSignalementIA.vue'
+import Icone from '../components/Icone.vue'
 </script>
 
 <style scoped>
@@ -55,6 +56,9 @@ import FormSignalementIA from '../components/FormSignalementIA.vue'
 }
 
 .back-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   display: grid;
   place-items: center;
   width: 34px;

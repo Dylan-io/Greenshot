@@ -4,7 +4,7 @@
     <!-- En-tête de la page -->
     <header class="classement-header">
       <div class="header-tag">
-        <span class="tag-trophy">🏆</span>
+        <span class="tag-trophy"><Icone nom="trophee" /></span>
         Impact Citoyen · Greenshot
       </div>
       <h1 class="page-title">Classement</h1>
@@ -33,7 +33,7 @@
     <div class="filter-ville-bar">
       <span class="ville-label">Territoire :</span>
       <select v-model="villeSelectionnee" class="select-ville" @change="recalculerClassement">
-        <option value="">🌍 Tout le Burundi</option>
+        <option value="">Tout le Burundi</option>
         <option value="Bujumbura">Bujumbura</option>
         <option value="Gitega">Gitega</option>
         <option value="Ngozi">Ngozi</option>
@@ -78,7 +78,7 @@
 
           <!-- 1ère PLACE (Au centre, plus grand, ambre #E8A33D) -->
           <div v-if="topTrois[0]" class="podium-col rank-1">
-            <div class="crown-icon">👑</div>
+            <div class="crown-icon"><Icone nom="couronne" /></div>
             <div class="user-avatar-wrap">
               <span class="avatar-initials avatar-gold">{{ extraireInitiales(topTrois[0].nom) }}</span>
               <span class="rank-badge badge-gold">1</span>
@@ -116,10 +116,10 @@
 
       <!-- État vide si aucun citoyen dans la ville sélectionnée -->
       <div v-if="classementComplet.length === 0" class="empty-classement">
-        <span class="empty-icon">🌱</span>
+        <span class="empty-icon"><Icone nom="feuille" /></span>
         <h3>Aucun citoyen classé pour l'instant</h3>
         <p>Soyez le premier à signaler ou nettoyer pour prendre la tête du classement !</p>
-        <router-link to="/signaler" class="btn-agir">📸 Signaler un déchet</router-link>
+        <router-link to="/signaler" class="btn-agir"><Icone nom="image" /> Signaler un déchet</router-link>
       </div>
 
       <!-- 3. LISTE DU CLASSEMENT (à partir du 4e rang) -->
@@ -147,7 +147,7 @@
                 <span class="row-name">{{ citoyen.nom }}</span>
                 <span v-if="estUtilisateurCourant(citoyen)" class="you-badge">Vous</span>
               </div>
-              <span class="row-city">📍 {{ citoyen.ville || 'Burundi' }}</span>
+              <span class="row-city"><Icone nom="localisation" /> {{ citoyen.ville || 'Burundi' }}</span>
             </div>
 
             <!-- Score total mis en avant en vert forêt #1F4D3A -->
@@ -172,7 +172,7 @@
                 <span class="sticky-name">{{ profilCourant.nom }}</span>
                 <span class="you-badge-gold">Votre position</span>
               </div>
-              <span class="sticky-city">📍 {{ profilCourant.ville || 'Bujumbura' }}</span>
+              <span class="sticky-city"><Icone nom="localisation" /> {{ profilCourant.ville || 'Bujumbura' }}</span>
             </div>
           </div>
           <div class="sticky-right">
@@ -190,6 +190,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { supabase, supabaseConfigured } from '../services/supabaseClient'
 import { useUserStore } from '../stores/userStore'
+import Icone from '../components/Icone.vue'
 
 const userStore = useUserStore()
 
@@ -336,7 +337,7 @@ function estUtilisateurCourant(citoyen) {
 }
 
 function extraireInitiales(nom) {
-  if (!nom) return '🌱'
+  if (!nom) return '?'
   const parties = nom.trim().split(/\s+/)
   if (parties.length >= 2) {
     return (parties[0][0] + parties[1][0]).toUpperCase()
@@ -378,6 +379,9 @@ function tronquerNom(nom) {
 }
 
 .tag-trophy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.85rem;
 }
 
@@ -733,6 +737,9 @@ function tronquerNom(nom) {
 }
 
 .row-city {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   font-size: 0.72rem;
   color: var(--color-text-muted, #64748B);
   display: block;
@@ -841,6 +848,9 @@ function tronquerNom(nom) {
 }
 
 .sticky-city {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   font-size: 0.7rem;
   color: var(--color-text-muted, #64748B);
 }
@@ -913,6 +923,9 @@ function tronquerNom(nom) {
 }
 
 .empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 2.2rem;
   margin-bottom: 0.5rem;
   display: block;
@@ -932,6 +945,10 @@ function tronquerNom(nom) {
 }
 
 .btn-agir {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   display: inline-block;
   background-color: var(--color-primary, #1F4D3A);
   color: #FFFFFF;

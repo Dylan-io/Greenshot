@@ -25,7 +25,7 @@
           :class="{ 'chip-active': categoriesSelectionnees.includes(cat.id) }"
           @click="basculerCategorie(cat.id)"
         >
-          <span class="chip-icon">{{ cat.icone || '📍' }}</span>
+          <span class="chip-icon"><Icone :nom="cat.icone || 'localisation'" taille="15px" :trait="2.2" /></span>
           <span class="chip-label">{{ cat.nom }}</span>
           <span class="chip-count">{{ compterSignalementsParCategorie(cat.id, cat.nom) }}</span>
         </button>
@@ -51,13 +51,13 @@
     <!-- Message d'état vide encourageant -->
     <transition name="fade">
       <div v-if="!store.chargementSignalements && signalementsFiltres.length === 0" class="empty-state-floating">
-        <div class="empty-icon">🌱</div>
+        <div class="empty-icon"><Icone nom="feuille" /></div>
         <div class="empty-text">
           <strong>Aucun signalement dans cette sélection</strong>
           <p>Soyez le premier à signaler un déchet dans cette zone !</p>
         </div>
         <router-link to="/signaler" class="btn-nouveau-signalement">
-          📸 Signaler (+pts)
+          <Icone nom="image" /> Signaler (+pts)
         </router-link>
       </div>
     </transition>
@@ -76,6 +76,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useSignalementStore } from '../stores/signalementStore'
 import { supabase, supabaseConfigured } from '../services/supabaseClient'
 import CarteInteractive from '../components/CarteInteractive.vue'
+import Icone from '../components/Icone.vue'
 
 const store = useSignalementStore()
 
@@ -238,6 +239,8 @@ function compterSignalementsParCategorie(catId, catNom) {
   color: #475569;
   font-size: 0.72rem;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  /* le conteneur parent désactive les événements : on les rétablit ici */
+  pointer-events: auto;
 }
 
 .sync-dot {
@@ -272,14 +275,28 @@ function compterSignalementsParCategorie(catId, catNom) {
   display: flex;
   gap: 0.45rem;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 4px 2px 8px;
   pointer-events: auto;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(31, 77, 58, 0.3) transparent;
 }
 
 .chips-scroll::-webkit-scrollbar {
-  display: none;
+  height: 5px;
+}
+
+.chips-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chips-scroll::-webkit-scrollbar-thumb {
+  background: rgba(31, 77, 58, 0.3);
+  border-radius: 9999px;
 }
 
 .filter-chip {
@@ -301,6 +318,7 @@ function compterSignalementsParCategorie(catId, catNom) {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-tap-highlight-color: transparent;
   flex-shrink: 0;
+  scroll-snap-align: start;
 }
 
 .filter-chip:hover {
@@ -316,8 +334,13 @@ function compterSignalementsParCategorie(catId, catNom) {
 }
 
 .chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
   font-size: 0.85rem;
 }
+
 
 .chip-count {
   font-size: 0.68rem;
@@ -382,6 +405,9 @@ function compterSignalementsParCategorie(catId, catNom) {
 }
 
 .empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.5rem;
   flex-shrink: 0;
 }
@@ -406,6 +432,9 @@ function compterSignalementsParCategorie(catId, catNom) {
 }
 
 .btn-nouveau-signalement {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   background: var(--color-primary, #1F4D3A);
   color: #FFFFFF;
   text-decoration: none;

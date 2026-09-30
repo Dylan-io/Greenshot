@@ -10,7 +10,7 @@
         Prenez une photo sur le terrain et géolocalisez un déchet pour mobiliser la communauté et cumuler des points.
       </p>
       <RouterLink to="/signalement-ia" class="mode-ia-link">
-        Essayer le signalement assisté par IA →
+        Essayer le signalement assisté par IA <Icone nom="fleche_droite" />
       </RouterLink>
     </header>
 
@@ -22,6 +22,7 @@
 
 <script setup>
 import FormSignalement from '../components/FormSignalement.vue'
+import Icone from '../components/Icone.vue'
 </script>
 
 <style scoped>
@@ -74,6 +75,7 @@ import FormSignalement from '../components/FormSignalement.vue'
 }
 
 .mode-ia-link {
+  gap: 0.3rem;
   display: inline-flex;
   align-items: center;
   min-height: 40px;
