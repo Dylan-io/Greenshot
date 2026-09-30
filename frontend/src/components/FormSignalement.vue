@@ -20,17 +20,64 @@
         </div>
       </div>
 
-      <!-- 2. Géolocalisation automatique -->
+      <!-- 2. Géolocalisation automatique (modifiable) -->
       <div class="form-group">
         <label class="label-title">📍 2. Localisation GPS :</label>
         <div v-if="gpsEnCours" class="gps-status checking">
           🛰️ Recherche du signal satellite GPS en cours...
         </div>
         <div v-else-if="gpsCoordonnees" class="gps-status success">
-          ✅ Coordonnées capturées : {{ gpsCoordonnees.lat.toFixed(5) }}, {{ gpsCoordonnees.lng.toFixed(5) }}
+          ✅ Coordonnées capturées : {{ Number(gpsCoordonnees.lat).toFixed(5) }}, {{ Number(gpsCoordonnees.lng).toFixed(5) }}
         </div>
         <div v-else class="gps-status warning">
           ⚠️ GPS non capturé. <button type="button" @click="capturerGps" class="btn-gps">Réessayer</button>
+        </div>
+
+        <!--
+          Le GPS est capturé automatiquement à l'ouverture du formulaire.
+          Certains endroits (sous un toit, ruelle étroite, GPS erratique)
+          donnent une position imprécise : l'utilisateur peut donc corriger
+          les coordonnées à la main. La correction manuelle est prioritaire,
+          la capture automatique ne s'exécutant qu'une fois au chargement.
+        -->
+        <div v-if="gpsCoordonnees" class="gps-edit">
+          <p class="gps-edit-help">
+            Si l'endroit est mal identifié (GPS faible, sous un toit…), corrigez les coordonnées :
+          </p>
+          <div class="gps-inputs">
+            <label class="gps-input-label">
+              Latitude
+              <input
+                v-model.number="gpsCoordonnees.lat"
+                type="number"
+                step="0.0000001"
+                min="-90"
+                max="90"
+                class="text-input"
+              />
+            </label>
+            <label class="gps-input-label">
+              Longitude
+              <input
+                v-model.number="gpsCoordonnees.lng"
+                type="number"
+                step="0.0000001"
+                min="-180"
+                max="180"
+                class="text-input"
+              />
+            </label>
+          </div>
+          <div class="gps-actions">
+            <button type="button" @click="capturerGps" class="btn-gps">
+              📡 Recapturer
+            </button>
+            <span v-if="gpsModifie" class="gps-modified">✏️ Position corrigée manuellement</span>
+          </div>
+        </div>
+
+        <div v-if="erreurGps" class="gps-status warning">
+          {{ erreurGps }}
         </div>
       </div>
 
@@ -67,6 +114,13 @@
         ></textarea>
       </div>
 
+      <div v-if="raisonBloquant" class="alert-error">
+        ⚠️ {{ raisonBloquant }}
+        <RouterLink v-if="!userStore.isAuthenticated" to="/connexion" class="alert-link">
+          Se connecter
+        </RouterLink>
+      </div>
+
       <div v-if="messageErreur" class="alert-error">
         {{ messageErreur }}
       </div>
@@ -76,9 +130,9 @@
       </div>
 
       <!-- Bouton Soumission -->
-      <button 
-        type="submit" 
-        class="btn-submit" 
+      <button
+        type="submit"
+        class="btn-submit"
         :disabled="envoiEnCours || !peutEnvoyer"
       >
         <span v-if="envoiEnCours">Compression et téléversement en cours...</span>
@@ -89,8 +143,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter, RouterLink } from 'vue-router'
 import { supabase, supabaseConfigured } from '../services/supabaseClient'
 import { useUserStore } from '../stores/userStore'
 import imageCompression from 'browser-image-compression'
@@ -102,6 +156,8 @@ const photoFichier = ref(null)
 const photoPreview = ref(null)
 const gpsCoordonnees = ref(null)
 const gpsEnCours = ref(false)
+const gpsModifie = ref(false)
+const erreurGps = ref('')
 const categoriesDisponibles = ref([])
 const categorieChoisie = ref('')
 const ville = ref('Bujumbura')
@@ -116,29 +172,84 @@ onMounted(async () => {
   await chargerCategories()
 })
 
+// Capture automatique de la position.
+// IMPORTANT : en cas d'échec, on ne substitue PLUS une position par défaut
+// (Bujumbura centre-ville). Un signalement géolocalisé au centre-ville alors
+// que l'utilisateur est à Rohero polluait la carte et les statistiques
+// envoyées aux bailleurs. L'utilisateur doit saisir la position à la main.
 function capturerGps() {
-  if ('geolocation' in navigator) {
-    gpsEnCours.value = true
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        gpsCoordonnees.value = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        }
-        gpsEnCours.value = false
-      },
-      (err) => {
-        console.warn('GPS indisponible:', err)
-        gpsEnCours.value = false
-        // Coordonnées par défaut : Bujumbura
-        gpsCoordonnees.value = { lat: -3.3822, lng: 29.3644 }
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    )
-  } else {
-    gpsCoordonnees.value = { lat: -3.3822, lng: 29.3644 }
+  erreurGps.value = ''
+
+  if (!('geolocation' in navigator)) {
+    erreurGps.value = "La géolocalisation n'est pas disponible sur cet appareil. Saisissez les coordonnées à la main."
+    return
   }
+
+  gpsEnCours.value = true
+  gpsModifie.value = false
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      gpsCoordonnees.value = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      }
+      gpsEnCours.value = false
+    },
+    (err) => {
+      console.warn('GPS indisponible:', err)
+      gpsEnCours.value = false
+      gpsCoordonnees.value = null
+      erreurGps.value =
+        err.code === err.PERMISSION_DENIED
+          ? "Accès à la localisation refusé. Autorisez-le dans votre navigateur, ou saisissez les coordonnées à la main."
+          : 'Position GPS introuvable (signal faible). Saisissez les coordonnées à la main.'
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+  )
 }
+
+// Validation des coordonnées avant envoi (saisie manuelle ou GPS)
+// La colonne est en NUMERIC(10,7) : on refuse en amont les valeurs
+// aberrantes que Postgres rejeterait, et le cas du Burundi est signalé
+// explicitement pour éviter une erreur de saisie.
+function validerGps() {
+  if (!gpsCoordonnees.value) {
+    erreurGps.value = 'La localisation est obligatoire pour envoyer un signalement.'
+    return false
+  }
+
+  const lat = Number(gpsCoordonnees.value.lat)
+  const lng = Number(gpsCoordonnees.value.lng)
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    erreurGps.value = 'Coordonnées invalides. Vérifiez les valeurs saisies.'
+    return false
+  }
+
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    erreurGps.value = 'Coordonnées hors de la plage du globe (latitude -90..90, longitude -180..180).'
+    return false
+  }
+
+  if (lat < -5 || lat > -2 || lng < 28 || lng > 32) {
+    erreurGps.value = 'Ces coordonnées sont hors du Burundi. Vérifiez la saisie, ou utilisez 📡 Recapturer.'
+    return false
+  }
+
+  gpsCoordonnees.value.lat = lat
+  gpsCoordonnees.value.lng = lng
+  erreurGps.value = ''
+  return true
+}
+
+// Détecte une correction manuelle pour l'afficher à l'utilisateur
+watch(gpsCoordonnees, (nv, old) => {
+  if (!nv || !old) return
+  if (Number(nv.lat) !== Number(old.lat) || Number(nv.lng) !== Number(old.lng)) {
+    gpsModifie.value = true
+  }
+}, { deep: true })
 
 async function chargerCategories() {
   if (!supabaseConfigured) {
@@ -160,7 +271,15 @@ async function chargerCategories() {
   }
 }
 
+// Catégories de secours affichées quand Supabase est injoignable.
+// ⚠️ Elles ne sont PAS soumettibles : leurs `id` sont des chaînes ('1'..'5')
+// qui ne correspondent à aucun UUID réel et violeraient la clé étrangère
+// `categorie_id`. Avant, l'utilisateur remplissait le formulaire pour voir
+// ensuite un échec d'insertion incompréhensible.
+const categoriesSecours = ref(false)
+
 function appliquerCategoriesSecours() {
+  categoriesSecours.value = true
   categoriesDisponibles.value = [
     { id: '1', nom: 'Déchets plastiques', points_signalement: 10 },
     { id: '2', nom: 'Décharge sauvage', points_signalement: 15 },
@@ -179,10 +298,33 @@ function gererSelectionPhoto(event) {
 }
 
 const peutEnvoyer = computed(() => {
-  return photoFichier.value && gpsCoordonnees.value && categorieChoisie.value
+  return photoFichier.value
+    && gpsCoordonnees.value
+    && categorieChoisie.value
+    && !categoriesSecours.value
+    && !gpsEnCours.value
+    && userStore.isAuthenticated
+})
+
+const raisonBloquant = computed(() => {
+  if (categoriesSecours.value) {
+    return "Connexion à la base impossible. Le signalement ne peut pas être envoyé pour le moment."
+  }
+  if (!userStore.isAuthenticated) {
+    return "Connectez-vous pour déposer un signalement."
+  }
+  if (!userStore.peutSignaler()) {
+    return "Vérifiez votre adresse email avant de signaler un problème."
+  }
+  return ''
 })
 
 async function soumettreSignalement() {
+  if (!validerGps()) return
+  if (raisonBloquant.value) {
+    messageErreur.value = raisonBloquant.value
+    return
+  }
   if (!peutEnvoyer.value) return
 
   envoiEnCours.value = true
@@ -199,24 +341,35 @@ async function soumettreSignalement() {
     const photoCompressee = await imageCompression(photoFichier.value, options)
 
     // 2. Upload photo vers Supabase Storage
+    // Plus de repli sur une photo Unsplash : une fausse image de preuve
+    // fausseuse la géolocalisation ET le score de nettoyage du site.
     const fileName = `signalement-${Date.now()}.jpg`
-    const { data: uploadData, error: uploadErr } = await supabase.storage
+    const { error: uploadErr } = await supabase.storage
       .from('signalements-photos')
       .upload(fileName, photoCompressee)
 
-    let photoUrl = 'https://images.unsplash.com/photo-1605600659873-d808a13e4d2a?w=500' // fallback
-    if (!uploadErr && uploadData) {
-      const { data: publicData } = supabase.storage
-        .from('signalements-photos')
-        .getPublicUrl(fileName)
-      photoUrl = publicData.publicUrl
+    if (uploadErr) {
+      throw new Error("La photo n'a pas pu être envoyée. Vérifiez votre connexion internet et réessayez.")
     }
 
-    // 3. Récupérer l'utilisateur courant (ou utilisateur démo)
-    const currentUserId = userStore.user?.id || '00000000-0000-0000-0000-000000000000'
+    const { data: publicData } = supabase.storage
+      .from('signalements-photos')
+      .getPublicUrl(fileName)
+    const photoUrl = publicData.publicUrl
+
+    // 3. Récupérer l'utilisateur authentifié
+    // Plus de repli sur un UUID nul : il violait la clé étrangère user_id
+    // et la politique RLS (auth.uid() = user_id), donc l'insert échouait.
+    const currentUserId = userStore.user?.id
+    if (!currentUserId) {
+      throw new Error('Session expirée. Reconnectez-vous pour envoyer votre signalement.')
+    }
 
     // 4. Insertion dans la table signalements
-    const { data: inserted, error: insertErr } = await supabase
+    // Le statut n'est PAS envoyé : il prend sa valeur par défaut 'en_attente'.
+    // Les droits d'insertion sont limités aux colonnes ci-dessous, donc
+    // un client ne peut pas déclarer un signalement déjà nettoyé.
+    const { error: insertErr } = await supabase
       .from('signalements')
       .insert({
         user_id: currentUserId,
@@ -225,13 +378,16 @@ async function soumettreSignalement() {
         latitude: gpsCoordonnees.value.lat,
         longitude: gpsCoordonnees.value.lng,
         ville: ville.value,
-        description: description.value,
-        statut: 'en_attente'
+        description: description.value
       })
-      .select()
-      .single()
 
-    if (insertErr) throw insertErr
+    if (insertErr) {
+      // 42501 = permission RLS refusée : email non vérifié le plus souvent
+      if (insertErr.code === '42501') {
+        throw new Error("Signalement refusé : vous devez avoir vérifié votre adresse email. Vérifiez votre boîte de réception.")
+      }
+      throw insertErr
+    }
 
     messageSucces.value = 'Votre signalement a été enregistré avec succès ! Vos points ont été crédités.'
     setTimeout(() => {
@@ -325,6 +481,63 @@ async function soumettreSignalement() {
   border: none;
   border-radius: 4px;
   cursor: pointer;
+}
+
+/* --- Correction manuelle de la position GPS --- */
+.gps-edit {
+  margin-top: 0.6rem;
+  padding: 0.75rem;
+  background: #F8FAFC;
+  border: 1px dashed #CBD5E1;
+  border-radius: 6px;
+}
+
+.gps-edit-help {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  color: #64748B;
+  line-height: 1.4;
+}
+
+.gps-inputs {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.gps-input-label {
+  flex: 1;
+  font-size: 0.75rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.gps-input-label .text-input {
+  margin-top: 0.2rem;
+  font-size: 0.85rem;
+}
+
+.gps-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.gps-actions .btn-gps {
+  margin-left: 0;
+}
+
+.gps-modified {
+  font-size: 0.72rem;
+  color: #92400E;
+  font-weight: 500;
+}
+
+.alert-link {
+  color: #1E40AF;
+  font-weight: 600;
+  text-decoration: underline;
+  margin-left: 0.35rem;
 }
 
 .select-input, .text-input, .textarea-input {

@@ -12,9 +12,31 @@
           <router-link to="/nettoyage" class="nav-clean">Nettoyer 🧹</router-link>
           <router-link to="/classement">Classement</router-link>
           <router-link to="/profil">Profil</router-link>
+          <!-- Lien auth : se connecter ou s'inscrire -->
+          <template v-if="!isAuthenticated">
+            <router-link to="/connexion" class="nav-auth">Connexion</router-link>
+            <router-link to="/inscription" class="nav-auth nav-inscription">S'inscrire</router-link>
+          </template>
+          <template v-else>
+            <span class="nav-user">👤 {{ profile.username || profile.nom }}</span>
+            <button @click="deconnecter" class="btn-deconnexion">Déconnexion</button>
+          </template>
         </nav>
       </div>
     </header>
+
+    <!-- Bannière de vérification email si nécessaire -->
+    <div v-if="isAuthenticated && !profile.email_verified" class="verification-banner">
+      ⚠️ <strong>Votre email n'est pas encore vérifié.</strong> 
+      Vous pouvez naviguer sur l'application, mais pour <strong>signaler un problème</strong>, 
+      vous devez cliquer sur le lien dans l'email que nous vous avons envoyé.
+      <button @click="renvoyerVerification" class="btn-resend-verify">📧 Renvoyer l'email</button>
+    </div>
+
+    <!-- Avertissement si email non vérifié et page de signalement -->
+    <div v-if="isAuthenticated && !profile.email_verified && isOnSignalementPage" class="verification-warning">
+      ⛔ Vous devez vérifier votre email pour soumettre un signalement.
+    </div>
 
     <main class="app-content">
       <router-view />
@@ -23,7 +45,36 @@
 </template>
 
 <script setup>
-// Application Shell Greenshot
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from './stores/userStore'
+
+const router = useRouter()
+const userStore = useUserStore()
+
+const { user, profile, isAuthenticated } = userStore
+
+// Initialiser l'authentification au montage
+onMounted(() => {
+  userStore.initAuth()
+})
+
+// Vérifier si on est sur une page de signalement
+const isOnSignalementPage = computed(() => {
+  return router.currentRoute.value.path === '/' || 
+         router.currentRoute.value.path === '/nettoyage'
+})
+
+// Se déconnecter
+async function deconnecter() {
+  await userStore.deconnecter()
+  router.push('/connexion')
+}
+
+// Renvoyer l'email de vérification
+async function renvoyerVerification() {
+  await userStore.renvoyerVerification()
+}
 </script>
 
 <style>
@@ -78,6 +129,7 @@ body {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .main-nav a {
@@ -100,13 +152,88 @@ body {
   background-color: #ecfdf5;
 }
 
-.main-nav a.nav-clean {
-  color: #c07912;
-}
-
 .main-nav a.nav-clean.router-link-active {
   color: #c07912;
   background-color: #fdf6eb;
+}
+
+/* Lien auth dans la nav */
+.nav-auth {
+  color: #64748b !important;
+}
+
+.nav-auth.router-link-active {
+  color: #10b981 !important;
+  background-color: #ecfdf5 !important;
+}
+
+.nav-inscription {
+  background-color: #10B981 !important;
+  color: white !important;
+  border-radius: 6px;
+}
+
+.nav-user {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.btn-deconnexion {
+  padding: 0.3rem 0.65rem;
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.btn-deconnexion:hover {
+  background-color: #FEF2F2;
+  color: #991B1B;
+  border-color: #FECACA;
+}
+
+/* Bannière de vérification email */
+.verification-banner {
+  background: #FFFBEB;
+  border-bottom: 1px solid #FCD34D;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #92400E;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.verification-banner strong {
+  font-weight: 700;
+}
+
+.btn-resend-verify {
+  padding: 0.25rem 0.75rem;
+  background: #E8A33D;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+/* Avertissement sur la page de signalement */
+.verification-warning {
+  max-width: 960px;
+  margin: 0.5rem auto;
+  padding: 0.75rem 1rem;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  color: #991B1B;
+  font-size: 0.85rem;
+  text-align: center;
 }
 
 .app-content {
