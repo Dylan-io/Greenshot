@@ -85,9 +85,13 @@ async function chargerSignalements() {
       signalements.value = data
     }
   } catch (err) {
-    console.warn('Supabase signalements non dispo (affichage démo Bujumbura si vide):', err)
-    // Données de démonstration réalistes à Bujumbura si Supabase n'est pas encore connecté
-    if (signalements.value.length === 0) {
+    console.warn('Supabase signalements indisponible:', err)
+    // Données de démonstration : UNIQUEMENT en développement local.
+    // En production, ces 3 signalements fictifs s'afficheraient sur la carte
+    // avec de vraies coordonnées de Bujumbura et de vraies photos de décharges :
+    // un utilisateur ou un bailleur les prendrait pour de vrais signalements.
+    // Inacceptable pour un projet dont la promesse est la fiabilité de la donnée.
+    if (import.meta.env.DEV && signalements.value.length === 0) {
       signalements.value = [
         {
           id: 'demo-1',

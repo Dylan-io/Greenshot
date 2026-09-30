@@ -109,12 +109,23 @@ const ongletActif = ref('mes-signalements')
 const mesSignalements = ref([])
 const mesNettoyages = ref([])
 
-const profile = ref({
-  nom: 'Dyllan N.',
-  ville: 'Bujumbura, Burundi',
-  score_signalement: 30,
-  score_nettoyage: 90
-})
+// Valeurs initiales. En développement on garde un profil de démonstration
+// pour travailler la mise en page ; en production, un profil vide — afficher
+// un faux citoyen et ses faux points à un visiteur non connecté serait
+// trompeur, d'autant que « Dyllan N. » ressemble à un cas réel.
+const profile = ref(import.meta.env.DEV
+  ? {
+      nom: 'Dyllan N.',
+      ville: 'Bujumbura, Burundi',
+      score_signalement: 30,
+      score_nettoyage: 90
+    }
+  : {
+      nom: '',
+      ville: '',
+      score_signalement: 0,
+      score_nettoyage: 0
+    })
 
 const scoreTotal = computed(() => {
   return (profile.value.score_signalement || 0) + (profile.value.score_nettoyage || 0)
@@ -128,16 +139,26 @@ async function chargerProfil() {
   try {
     const userId = userStore.user?.id
     if (userId) {
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', userId).single()
-      if (prof) profile.value = prof
+      // Colonnes explicitement listées : email / phone / email_verified ne
+      // sont plus accordées au rôle client (protection des PII). Le profil
+      // complet est déjà chargé par le store via obtenir_mon_profil().
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id, nom, ville, username, score_signalement, score_nettoyage, created_at')
+        .eq('id', userId)
+        .single()
+      if (prof) profile.value = { ...profile.value, ...prof }
 
       const { data: sigs } = await supabase.from('signalements').select('*, categories(nom)').eq('user_id', userId)
       if (sigs) mesSignalements.value = sigs
 
       const { data: cleans } = await supabase.from('signalements').select('*, categories(nom)').eq('nettoye_par_user_id', userId)
       if (cleans) mesNettoyages.value = cleans
-    } else {
-      // Données de démonstration
+    } else if (import.meta.env.DEV) {
+      // Données de démonstration : UNIQUEMENT en développement local.
+      // Un visiteur non connecté qui ouvrirait /profil en production ne doit
+      // pas voir un profil « Dyllan N. » avec un historique de nettoyages
+      // qui n'a jamais eu lieu.
       mesSignalements.value = [
         {
           id: 'sig-demo-1',
