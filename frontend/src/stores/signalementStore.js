@@ -341,7 +341,7 @@ export const useSignalementStore = defineStore('signalement', () => {
         }
       }
 
-      // 4. Insertion dans la table signalements
+      // 4. Insertion dans la table signalements (conformément aux colonnes autorisées par RLS)
       const { data: signalementCree, error: insertError } = await supabase
         .from('signalements')
         .insert({
@@ -350,13 +350,16 @@ export const useSignalementStore = defineStore('signalement', () => {
           photo_avant_url: photoUrl,
           latitude: Number(latitude.value),
           longitude: Number(longitude.value),
-          description: description.value ? description.value.trim() : null,
-          statut: 'en_attente'
+          ville: zoneDetectee.value || 'Bujumbura',
+          description: description.value ? description.value.trim() : null
         })
         .select()
         .single()
 
       if (insertError) {
+        if (insertError.code === '42501') {
+          throw new Error("Signalement refusé : vous devez être connecté et avoir vérifié votre adresse email.")
+        }
         throw insertError
       }
 

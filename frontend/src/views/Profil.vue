@@ -301,15 +301,25 @@ const enregistrementEnCours = ref(false)
 const messageSucces = ref('')
 const toastMessage = ref('')
 
-// Données du profil
-const profile = ref({
-  id: 'usr-7',
-  nom: 'Dyllan N.',
-  ville: 'Bujumbura (Ngagara)',
-  score_signalement: 40,
-  score_nettoyage: 80,
-  created_at: new Date('2026-03-01T10:00:00Z').toISOString()
-})
+// Valeurs initiales. En développement on garde un profil de démonstration
+// pour travailler la mise en page ; en production, un profil vide pour ne pas afficher
+// un faux citoyen à un visiteur non connecté.
+const profile = ref(import.meta.env.DEV
+  ? {
+      id: 'usr-7',
+      nom: 'Dyllan N.',
+      ville: 'Bujumbura (Ngagara)',
+      score_signalement: 40,
+      score_nettoyage: 80,
+      created_at: new Date('2026-03-01T10:00:00Z').toISOString()
+    }
+  : {
+      nom: '',
+      ville: '',
+      score_signalement: 0,
+      score_nettoyage: 0
+    })
+
 
 const mesSignalements = ref([])
 const mesNettoyages = ref([])
@@ -468,15 +478,18 @@ async function chargerDonneesProfil() {
 
     if (userId) {
       // 2. Charger le profil Supabase
-      const { data: profData, error: profError } = await supabase
+      // Colonnes explicitement listées : email / phone / email_verified ne
+      // sont plus accordées au rôle client (protection des PII). Le profil
+      // complet est déjà chargé par le store via obtenir_mon_profil().
+      const { data: prof, error: profError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, nom, ville, username, score_signalement, score_nettoyage, created_at')
         .eq('id', userId)
         .maybeSingle()
 
-      if (!profError && profData) {
-        profile.value = profData
-        userStore.profile = profData
+      if (!profError && prof) {
+        profile.value = { ...profile.value, ...prof }
+        userStore.profile = { ...userStore.profile, ...prof }
       }
 
       // 3. Charger les signalements faits par l'utilisateur
@@ -500,15 +513,20 @@ async function chargerDonneesProfil() {
       // 5. Calculer le rang dans le classement
       await calculerRangUtilisateur(userId)
     } else {
-      // Utilisateur en mode démonstration
-      appliquerDemoData(fallbackSignalements, fallbackNettoyages)
+      // Données de démonstration : UNIQUEMENT en développement local
+      if (import.meta.env.DEV) {
+        appliquerDemoData(fallbackSignalements, fallbackNettoyages)
+      }
     }
   } catch (err) {
     console.warn('Erreur chargement profil Supabase, utilisation démo:', err)
-    appliquerDemoData(fallbackSignalements, fallbackNettoyages)
+    if (import.meta.env.DEV) {
+      appliquerDemoData(fallbackSignalements, fallbackNettoyages)
+    }
   } finally {
     chargement.value = false
   }
+
 }
 
 function appliquerDemoData(sigDemo, cleanDemo) {

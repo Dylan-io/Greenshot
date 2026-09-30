@@ -390,12 +390,16 @@ async function chargerDetails() {
 
       historique.value = histData || []
     } else {
-      // Si introuvable dans Supabase, utiliser un exemple démo adapté
-      signalement.value = SIGNALEMENTS_DEMO[idRecherche] || SIGNALEMENTS_DEMO['sig-buj-1']
+      // Données de démonstration : UNIQUEMENT en développement local
+      if (import.meta.env.DEV) {
+        signalement.value = SIGNALEMENTS_DEMO[idRecherche] || SIGNALEMENTS_DEMO['sig-buj-1']
+      }
     }
   } catch (err) {
-    console.warn('Erreur chargement signalement Supabase, affichage exemple:', err)
-    signalement.value = SIGNALEMENTS_DEMO[idRecherche] || SIGNALEMENTS_DEMO['sig-buj-1']
+    console.warn('Erreur chargement signalement:', err)
+    if (import.meta.env.DEV) {
+      signalement.value = SIGNALEMENTS_DEMO[idRecherche] || SIGNALEMENTS_DEMO['sig-buj-1']
+    }
   } finally {
     chargement.value = false
   }

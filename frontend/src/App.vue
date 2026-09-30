@@ -13,16 +13,34 @@
           </div>
           <span class="brand-title">Green<span>shot</span></span>
         </router-link>
+        <div class="header-actions">
+          <!-- Badge discret de contexte pays -->
+          <div class="header-badge">
+            <span class="badge-flag">🇧🇮</span>
+            <span class="badge-country">Burundi</span>
+          </div>
 
-        <!-- Badge discret de contexte pays -->
-        <div class="header-badge">
-          <span class="badge-flag">🇧🇮</span>
-          <span class="badge-country">Burundi</span>
+          <!-- Liens rapides auth si non connecté -->
+          <div v-if="!userStore.isAuthenticated" class="header-auth">
+            <router-link to="/connexion" class="link-auth">Connexion</router-link>
+            <router-link to="/inscription" class="link-auth btn-inscrire-mini">S'inscrire</router-link>
+          </div>
+          <div v-else class="header-user">
+            <router-link to="/profil" class="link-user-profile" title="Mon profil">
+              👤 {{ userStore.profile?.username || userStore.profile?.nom?.split(' ')[0] || 'Profil' }}
+            </router-link>
+          </div>
         </div>
       </div>
     </header>
 
-    <!-- Contenu principal scrollable avec padding de sécurité pour la barre du bas -->
+    <!-- Bannière de vérification email si nécessaire -->
+    <div v-if="userStore.isAuthenticated && !userStore.profile?.email_verified" class="verification-banner">
+      ⚠️ <strong>Votre email n'est pas encore vérifié.</strong> 
+      Pour valider vos actions, cliquez sur le lien reçu par email.
+      <button @click="renvoyerVerification" class="btn-resend-verify" type="button">📧 Renvoyer l'email</button>
+    </div>
+
     <main class="app-content">
       <router-view />
     </main>
@@ -33,7 +51,22 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
+import { useUserStore } from './stores/userStore'
 import BottomNav from './components/BottomNav.vue'
+
+const userStore = useUserStore()
+
+// Initialiser l'authentification au montage
+onMounted(() => {
+  userStore.initAuth()
+})
+
+// Renvoyer l'email de vérification
+async function renvoyerVerification() {
+  await userStore.renvoyerVerification()
+}
+
 </script>
 
 <style>
@@ -152,13 +185,92 @@ h1, h2, h3, h4, .font-title {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
-  padding: 0.2rem 0.6rem;
+  padding: 0.2rem 0.55rem;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-text-muted);
 }
 
-/* Contenu scrollable Mobile-First avec padding de sécurité pour la BottomNav */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-auth {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.link-auth {
+  text-decoration: none;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-primary, #1F4D3A);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.link-auth:hover {
+  background: var(--color-primary-light, #EBF3EF);
+}
+
+.btn-inscrire-mini {
+  background: var(--color-primary, #1F4D3A) !important;
+  color: #FFFFFF !important;
+}
+
+.btn-inscrire-mini:hover {
+  background: var(--color-primary-hover, #163a2c) !important;
+}
+
+.header-user {
+  display: flex;
+  align-items: center;
+}
+
+.link-user-profile {
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-primary, #1F4D3A);
+  background: var(--color-primary-light, #EBF3EF);
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid rgba(31, 77, 58, 0.15);
+}
+
+/* Bannière de vérification email */
+.verification-banner {
+  background: #FFFBEB;
+  border-bottom: 1px solid #FCD34D;
+  padding: 0.65rem 1rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #92400E;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.verification-banner strong {
+  font-weight: 700;
+}
+
+.btn-resend-verify {
+  padding: 0.2rem 0.6rem;
+  background: #E8A33D;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.4rem;
+}
+
 .app-content {
   max-width: 480px;
   width: 100%;

@@ -156,6 +156,31 @@
             </button>
           </div>
         </div>
+
+        <!-- Saisie / correction manuelle GPS si nécessaire -->
+        <div v-if="store.latitude !== null && store.longitude !== null" class="gps-edit-box">
+          <button 
+            type="button" 
+            class="btn-toggle-gps-edit"
+            @click="editionGpsManuelle = !editionGpsManuelle"
+          >
+            {{ editionGpsManuelle ? '▲ Masquer l\'ajustement manuel' : '✏️ Ajuster manuellement les coordonnées' }}
+          </button>
+          
+          <div v-if="editionGpsManuelle" class="gps-inputs-row">
+            <label class="gps-field">
+              Latitude
+              <input v-model.number="store.latitude" type="number" step="0.000001" min="-5" max="-2" class="gps-num-input" />
+            </label>
+            <label class="gps-field">
+              Longitude
+              <input v-model.number="store.longitude" type="number" step="0.000001" min="28" max="32" class="gps-num-input" />
+            </label>
+          </div>
+          <small v-if="erreurGpsBurundi" class="gps-burundi-warning">
+            ⚠️ {{ erreurGpsBurundi }}
+          </small>
+        </div>
       </section>
 
       <!-- ÉTAPE 3 : Choix de la Catégorie en Chips -->
@@ -204,6 +229,17 @@
         </div>
       </section>
 
+      <!-- Message bloquant si non authentifié ou email non vérifié -->
+      <div v-if="raisonBloquant" class="bloquant-banner" role="alert">
+        <span class="bloquant-icon">⚠️</span>
+        <div class="bloquant-content">
+          <span>{{ raisonBloquant }}</span>
+          <router-link v-if="!userStore.isAuthenticated" to="/connexion" class="bloquant-link">
+            Se connecter
+          </router-link>
+        </div>
+      </div>
+
       <!-- ÉTAPE 5 : Bouton d'envoi ergonomique mobile -->
       <div class="actions-container">
         
@@ -217,11 +253,17 @@
         <button 
           type="submit" 
           class="btn-submit-signalement" 
-          :disabled="!store.formulaireValide || store.envoiEnCours"
+          :disabled="!store.formulaireValide || store.envoiEnCours || !!raisonBloquant || !!erreurGpsBurundi"
         >
           <template v-if="store.envoiEnCours">
             <span class="spinner-inline"></span>
             Envoi en cours...
+          </template>
+          <template v-else-if="!userStore.isAuthenticated">
+            Connectez-vous pour signaler
+          </template>
+          <template v-else-if="!userStore.peutSignaler()">
+            Vérifiez votre email pour signaler
           </template>
           <template v-else-if="!store.photoFichier">
             Prenez une photo pour continuer
@@ -240,7 +282,7 @@
           </template>
         </button>
 
-        <p v-if="!store.formulaireValide && !store.envoiEnCours" class="validation-hint">
+        <p v-if="!store.formulaireValide && !store.envoiEnCours && !raisonBloquant" class="validation-hint">
           Complétez les 3 premières étapes pour valider votre signalement.
         </p>
       </div>
@@ -262,6 +304,28 @@ const userStore = useUserStore()
 const inputFichier = ref(null)
 const succesAffiche = ref(false)
 const dernierScoreGagne = ref(10)
+const editionGpsManuelle = ref(false)
+
+const raisonBloquant = computed(() => {
+  if (!userStore.isAuthenticated) {
+    return "Connectez-vous pour déposer un signalement citoyen."
+  }
+  if (!userStore.peutSignaler()) {
+    return "Vérifiez votre adresse email avant de signaler un problème."
+  }
+  return ''
+})
+
+const erreurGpsBurundi = computed(() => {
+  if (store.latitude === null || store.longitude === null) return ''
+  const lat = Number(store.latitude)
+  const lng = Number(store.longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return 'Coordonnées GPS invalides.'
+  if (lat < -5 || lat > -2 || lng < 28 || lng > 32) {
+    return "Ces coordonnées sont en dehors du Burundi (lat: -5..-2, lng: 28..32)."
+  }
+  return ''
+})
 
 onMounted(async () => {
   // 1. Initialiser le store et les catégories Supabase
@@ -300,6 +364,14 @@ function gererChangementPhoto(e) {
 }
 
 async function declencherEnvoi() {
+  if (raisonBloquant.value) {
+    store.messageErreurEnvoi = raisonBloquant.value
+    return
+  }
+  if (erreurGpsBurundi.value) {
+    store.messageErreurEnvoi = erreurGpsBurundi.value
+    return
+  }
   if (!store.formulaireValide || store.envoiEnCours) return
 
   const resultat = await store.envoyerSignalement(userStore)
@@ -648,6 +720,59 @@ async function declencherEnvoi() {
   background: #9A4124;
 }
 
+/* Ajustement manuel GPS */
+.gps-edit-box {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--color-border, #E2E8F0);
+}
+
+.btn-toggle-gps-edit {
+  background: none;
+  border: none;
+  color: var(--color-text-muted, #64748B);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.btn-toggle-gps-edit:hover {
+  color: var(--color-primary, #1F4D3A);
+}
+
+.gps-inputs-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.gps-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #64748B);
+  font-weight: 600;
+}
+
+.gps-num-input {
+  border: 1px solid var(--color-border, #CBD5E1);
+  border-radius: var(--radius-sm, 8px);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.82rem;
+  font-family: monospace;
+}
+
+.gps-burundi-warning {
+  display: block;
+  margin-top: 0.35rem;
+  color: #B91C1C;
+  font-size: 0.75rem;
+}
+
 /* Catégories en Chips */
 .chips-container {
   display: flex;
@@ -734,6 +859,26 @@ async function declencherEnvoi() {
   margin-top: 0.35rem;
   font-size: 0.75rem;
   color: var(--color-text-muted, #64748b);
+}
+
+/* Bannière bloquante */
+.bloquant-banner {
+  background: #FFFBEB;
+  border: 1px solid #FCD34D;
+  border-radius: var(--radius-md, 12px);
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.85rem;
+  color: #92400E;
+}
+
+.bloquant-link {
+  color: #1E40AF;
+  font-weight: 700;
+  text-decoration: underline;
+  margin-left: 0.4rem;
 }
 
 /* Actions & Bouton d'envoi */
