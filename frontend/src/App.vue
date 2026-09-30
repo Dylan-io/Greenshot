@@ -13,24 +13,6 @@
           </div>
           <span class="brand-title">Green<span>shot</span></span>
         </router-link>
-        <div class="header-actions">
-          <!-- Badge discret de contexte pays -->
-          <div class="header-badge">
-            <span class="badge-flag">🇧🇮</span>
-            <span class="badge-country">Burundi</span>
-          </div>
-
-          <!-- Liens rapides auth si non connecté -->
-          <div v-if="!userStore.isAuthenticated" class="header-auth">
-            <router-link to="/connexion" class="link-auth">Connexion</router-link>
-            <router-link to="/inscription" class="link-auth btn-inscrire-mini">S'inscrire</router-link>
-          </div>
-          <div v-else class="header-user">
-            <router-link to="/profil" class="link-user-profile" title="Mon profil">
-              👤 {{ userStore.profile?.username || userStore.profile?.nom?.split(' ')[0] || 'Profil' }}
-            </router-link>
-          </div>
-        </div>
       </div>
     </header>
 
@@ -178,69 +160,7 @@ h1, h2, h3, h4, .font-title {
   color: var(--color-amber, #E8A33D);
 }
 
-.header-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: 0.2rem 0.55rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.header-auth {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.link-auth {
-  text-decoration: none;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--color-primary, #1F4D3A);
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  transition: background 0.15s ease;
-}
-
-.link-auth:hover {
-  background: var(--color-primary-light, #EBF3EF);
-}
-
-.btn-inscrire-mini {
-  background: var(--color-primary, #1F4D3A) !important;
-  color: #FFFFFF !important;
-}
-
-.btn-inscrire-mini:hover {
-  background: var(--color-primary-hover, #163a2c) !important;
-}
-
-.header-user {
-  display: flex;
-  align-items: center;
-}
-
-.link-user-profile {
-  text-decoration: none;
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--color-primary, #1F4D3A);
-  background: var(--color-primary-light, #EBF3EF);
-  padding: 0.25rem 0.55rem;
-  border-radius: var(--radius-full, 9999px);
-  border: 1px solid rgba(31, 77, 58, 0.15);
-}
 
 /* Bannière de vérification email */
 .verification-banner {
