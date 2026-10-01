@@ -1,7 +1,7 @@
-# CleanShoot — Vision, Modèle & Spécifications V1.0
+# Greenshot — Vision, Modèle & Spécifications V1.0
 
 ## 1. Vision du Projet
-CleanShoot est une web application ClimateTech burundaise qui permet aux citoyens, en particulier les jeunes, de :
+Greenshot est une web application ClimateTech burundaise qui permet aux citoyens, en particulier les jeunes, de :
 * Signaler des problèmes environnementaux (déchets plastiques, décharges sauvages, pollution d'eau, déforestation, etc.) via photo et géolocalisation.
 * Nettoyer eux-mêmes ces zones et en apporter la preuve par une photo "après".
 * Gagner des points pour ces deux types d'actions (avec un barème supérieur pour le nettoyage), et consulter un classement public.
@@ -11,7 +11,7 @@ CleanShoot est une web application ClimateTech burundaise qui permet aux citoyen
 ---
 
 ## 2. Modèle Économique & Données d'Impact
-CleanShoot n'est **pas** un produit B2C payant pour les citoyens.
+Greenshot n'est **pas** un produit B2C payant pour les citoyens.
 * **Cibles :** Bailleurs internationaux, ONG environnementales, agences de développement.
 * **Exigence technique :** L'application doit produire des indicateurs exportables et auditables (nombre de signalements, taux de résolution/nettoyage, répartition géographique par commune/quartier, répartition par catégorie de déchets).
 

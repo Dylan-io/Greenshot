@@ -95,13 +95,16 @@ async function chargerClassement() {
     if (error) throw error
     if (data && data.length > 0) {
       classement.value = data
-    } else {
-      // Données de démonstration si backend vide
+    } else if (import.meta.env.DEV) {
+      // Données de démonstration : UNIQUEMENT en développement local.
+      // En production, un classement vide affiche l'état vide du template.
+      // Greenshot vend de la donnée fiable à des bailleurs : afficher de
+      // faux citoyens avec de faux scores en production serait trompeur.
       chargerDonneesDemo()
     }
   } catch (err) {
-    console.warn('RPC obtenir_classement indisponible, affichage démo:', err)
-    chargerDonneesDemo()
+    console.warn('RPC obtenir_classement indisponible:', err)
+    if (import.meta.env.DEV) chargerDonneesDemo()
   } finally {
     chargement.value = false
   }

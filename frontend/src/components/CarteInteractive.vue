@@ -1,52 +1,138 @@
 <template>
-  <div class="carte-interactive-wrapper">
+  <div class="carte-interactive-container">
+    
     <!-- Conteneur Carte Leaflet -->
-    <div id="leaflet-map" ref="mapContainer" class="map-container"></div>
+    <div id="leaflet-map" ref="mapContainer" class="map-viewport"></div>
 
-    <!-- Légende Flottante Interactive -->
-    <div class="map-legend">
-      <div class="legend-header">
-        <span class="legend-title">Statuts CleanShoot</span>
-        <button class="legend-toggle" @click="legendCollapsed = !legendCollapsed">
-          {{ legendCollapsed ? '+' : '−' }}
-        </button>
-      </div>
+    <!-- Bouton Flottant Recentrer sur ma position (Locate) -->
+    <button 
+      type="button" 
+      class="btn-locate-user" 
+      @click="recentrerSurPosition" 
+      :title="userPosition ? 'Recentrer sur ma position' : 'Obtenir ma position GPS'"
+      :class="{ 'locating': isLocating }"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" class="locate-icon">
+        <circle cx="12" cy="12" r="7"/>
+        <line x1="12" y1="1" x2="12" y2="5"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="1" y1="12" x2="5" y2="12"/>
+        <line x1="19" y1="12" x2="23" y2="12"/>
+      </svg>
+    </button>
 
-      <div v-show="!legendCollapsed" class="legend-items">
+    <!-- Légende Flottante Repliable (Coin inférieur gauche) -->
+    <div class="floating-legend" :class="{ 'legend-expanded': !legendCollapsed }">
+      <button type="button" class="legend-header-btn" @click="legendCollapsed = !legendCollapsed">
+        <span class="legend-badge-dot"></span>
+        <span class="legend-title">Catégories signalées</span>
+        <span class="legend-chevron">{{ legendCollapsed ? '▲' : '▼' }}</span>
+      </button>
+
+      <div v-show="!legendCollapsed" class="legend-body">
         <div 
-          v-for="(config, statusKey) in MAP_CONFIG.statusConfig" 
-          :key="statusKey"
-          class="legend-item"
+          v-for="(config, categoryKey) in MAP_CONFIG.categoryConfig"
+          :key="categoryKey"
+          class="legend-row"
         >
-          <img :src="config.iconUrl" alt="Pin" class="legend-pin-img" />
-          <div class="legend-text">
-            <span class="legend-label">{{ config.label }}</span>
-            <small class="legend-desc">{{ config.description }}</small>
+          <span class="legend-category-pin" :style="{ backgroundColor: config.color }" aria-hidden="true">{{ config.icon }}</span>
+          <div class="legend-info">
+            <span class="legend-label" :style="{ color: config.color }">{{ config.label }}</span>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Fiche Flottante en Bas d'Écran (Bottom Sheet) au clic sur une épingle -->
+    <transition name="slide-up">
+      <div v-if="selectedSignalement" class="bottom-sheet-card" role="dialog" aria-modal="true">
+        <button type="button" class="btn-close-sheet" @click="fermerFiche" aria-label="Fermer"><Icone nom="fermer" /></button>
+
+        <div class="sheet-content">
+          <!-- Vignette photo -->
+          <div class="sheet-thumb-wrapper">
+            <img 
+              :src="selectedSignalement.photo_avant_url || 'https://images.unsplash.com/photo-1605600659873-d808a13e4d2a?w=400'" 
+              alt="Photo du problème" 
+              class="sheet-thumb"
+            />
+            <span class="sheet-category-tag">
+              {{ selectedSignalement.categories?.nom || 'Signalement' }}
+            </span>
+          </div>
+
+          <!-- Détails & Statut -->
+          <div class="sheet-details">
+            <div class="sheet-header-row">
+              <span 
+                class="sheet-status-pill"
+                :style="{ 
+                  backgroundColor: getStatusConfig(selectedSignalement.statut).bgLight,
+                  color: getStatusConfig(selectedSignalement.statut).color 
+                }"
+              >
+                ● {{ getStatusConfig(selectedSignalement.statut).label }}
+              </span>
+
+              <!-- Distance approximative depuis l'utilisateur -->
+              <span v-if="distanceUtilisateur" class="sheet-distance">
+                <Icone nom="localisation" /> À {{ distanceUtilisateur }}
+              </span>
+            </div>
+
+            <p class="sheet-description">
+              {{ selectedSignalement.description || 'Signalement citoyen enregistré avec géolocalisation vérifiée.' }}
+            </p>
+
+            <div class="sheet-footer">
+              <span class="sheet-date">
+                {{ formaterDate(selectedSignalement.created_at) }}
+              </span>
+              <button 
+                type="button" 
+                class="btn-voir-detail" 
+                @click="allerAuDetail(selectedSignalement.id)"
+              >
+                Voir le détail <Icone nom="fleche_droite" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import L from 'leaflet'
-import { MAP_CONFIG, normaliserStatut } from '../config/mapConfig'
+import { MAP_CONFIG, normaliserCategorie, normaliserStatut, calculerDistance } from '../config/mapConfig'
+import Icone from './Icone.vue'
 
 const props = defineProps({
   signalements: {
     type: Array,
     default: () => []
+  },
+  userPosition: {
+    type: Object,
+    default: null
   }
 })
 
-const emit = defineEmits(['select-signalement', 'nettoyer-signalement'])
+const emit = defineEmits(['select-signalement'])
+const router = useRouter()
 
 const mapContainer = ref(null)
 let mapInstance = null
 let markersLayer = null
-const legendCollapsed = ref(false)
+let userMarker = null
+
+const legendCollapsed = ref(true) // Replié par défaut sur mobile
+const selectedSignalement = ref(null)
+const isLocating = ref(false)
 
 onMounted(() => {
   initialiserCarte()
@@ -63,44 +149,66 @@ watch(() => props.signalements, (nouvelleListe) => {
   mettreAJourMarqueurs(nouvelleListe)
 }, { deep: true })
 
+watch(() => props.userPosition, (newPos) => {
+  if (newPos && mapInstance) {
+    afficherMarqueurUtilisateur(newPos.latitude, newPos.longitude)
+  }
+}, { deep: true })
+
+const distanceUtilisateur = computed(() => {
+  if (!selectedSignalement.value || !props.userPosition) return null
+  return calculerDistance(
+    props.userPosition.latitude,
+    props.userPosition.longitude,
+    selectedSignalement.value.latitude,
+    selectedSignalement.value.longitude
+  )
+})
+
 function initialiserCarte() {
   if (!mapContainer.value) return
 
-  // 1. Initialiser Leaflet avec le centre par défaut (Bujumbura)
+  // 1. Vue initiale centrée sur le Burundi
   mapInstance = L.map(mapContainer.value, {
     center: MAP_CONFIG.defaultCenter,
     zoom: MAP_CONFIG.defaultZoom,
     minZoom: MAP_CONFIG.minZoom,
     maxZoom: MAP_CONFIG.maxZoom,
-    zoomControl: false
+    maxBounds: L.latLngBounds(MAP_CONFIG.burundiBounds),
+    maxBoundsViscosity: 0.85,
+    zoomControl: false // Nous utilisons les contrôles personnalisés ergonomiques mobile
   })
 
-  L.control.zoom({ position: 'topright' }).addTo(mapInstance)
-
-  // 2. Fond de tuiles CARTO Dark Matter (Gratuit, sans clé payante)
-  const cartoLayer = MAP_CONFIG.tileLayers.darkMatter
-  L.tileLayer(cartoLayer.url, {
-    attribution: cartoLayer.attribution,
-    subdomains: 'abcd',
+  // 2. Routes et lieux OpenStreetMap, sans clé CARTO
+  const mapLayer = MAP_CONFIG.tileLayers.openStreetMap
+  L.tileLayer(mapLayer.url, {
+    attribution: mapLayer.attribution,
     maxZoom: 19
   }).addTo(mapInstance)
+  L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(mapInstance)
 
-  // 3. Groupe de calques pour les marqueurs
+  // 3. Calque de marqueurs
   markersLayer = L.layerGroup().addTo(mapInstance)
 
   // 4. Positionner les épingles
   mettreAJourMarqueurs(props.signalements)
+
+  // 5. Si la position de l'utilisateur est déjà connue
+  if (props.userPosition?.latitude && props.userPosition?.longitude) {
+    afficherMarqueurUtilisateur(props.userPosition.latitude, props.userPosition.longitude)
+  }
 }
 
-function creerIconeStatut(statut) {
-  const statutClean = normaliserStatut(statut)
-  const config = MAP_CONFIG.statusConfig[statutClean] || MAP_CONFIG.statusConfig.en_attente
+function creerIconeCategorie(nomCategorie) {
+  const categorie = normaliserCategorie(nomCategorie)
+  const config = MAP_CONFIG.categoryConfig[categorie]
 
-  return L.icon({
-    iconUrl: config.iconUrl,
-    iconSize: [32, 42],
-    iconAnchor: [16, 42],
-    popupAnchor: [0, -38]
+  return L.divIcon({
+    className: 'category-marker-container',
+    html: `<span aria-label="${config.label}" style="display:grid;place-items:center;width:36px;height:36px;border:3px solid #fff;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:${config.color};box-shadow:0 2px 8px #0005;color:#fff;font-size:19px;font-weight:800"><span style="transform:rotate(45deg)">${config.icon}</span></span>`,
+    iconSize: [38, 44],
+    iconAnchor: [19, 42],
+    popupAnchor: [0, -40]
   })
 }
 
@@ -113,151 +221,462 @@ function mettreAJourMarqueurs(liste) {
   liste.forEach((sig) => {
     if (!sig.latitude || !sig.longitude) return
 
-    const customIcon = creerIconeStatut(sig.statut)
-    const marker = L.marker([Number(sig.latitude), Number(sig.longitude)], { icon: customIcon })
-    const statutClean = normaliserStatut(sig.statut)
-    const conf = MAP_CONFIG.statusConfig[statutClean]
+    const customIcon = creerIconeCategorie(sig.categories?.nom)
+    const marker = L.marker([Number(sig.latitude), Number(sig.longitude)], { 
+      icon: customIcon,
+      riseOnHover: true
+    })
 
-    const popupHtml = `
-      <div class="custom-map-popup">
-        ${sig.photo_avant_url ? `<img src="${sig.photo_avant_url}" alt="Photo" class="popup-thumb" />` : ''}
-        <h4 style="margin: 0.35rem 0 0.15rem; font-size: 0.95rem; font-weight: 700;">${sig.categories?.nom || 'Signalement'}</h4>
-        <p style="margin: 0 0 0.35rem; font-size: 0.8rem; color: #64748b;">📍 ${sig.ville || 'Bujumbura'}</p>
-        <div style="margin-bottom: 0.5rem;">
-          <span style="font-size: 0.75rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px; background: ${conf.bgLight}; color: ${conf.color}">
-            ${conf.label}
-          </span>
-        </div>
-        <div style="display: flex; gap: 0.35rem;">
-          <button id="btn-detail-${sig.id}" style="flex: 1; padding: 5px; font-size: 0.8rem; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            Détails
-          </button>
-          ${statutClean === 'en_attente' || statutClean === 'vu' ? `
-            <button id="btn-nettoyer-${sig.id}" style="flex: 1; padding: 5px; font-size: 0.8rem; background: #E8A33D; color: white; border: none; border-radius: 4px; cursor: pointer;">
-              Nettoyer 🧹
-            </button>
-          ` : ''}
-        </div>
-      </div>
-    `
+    // Au clic sur l'épingle : ouvrir la Bottom Sheet (pas de popup moche)
+    marker.on('click', () => {
+      selectedSignalement.value = sig
+      emit('select-signalement', sig)
 
-    marker.bindPopup(popupHtml)
-
-    marker.on('popupopen', () => {
-      const btnDetail = document.getElementById(`btn-detail-${sig.id}`)
-      if (btnDetail) {
-        btnDetail.onclick = () => emit('select-signalement', sig)
-      }
-      const btnNettoyer = document.getElementById(`btn-nettoyer-${sig.id}`)
-      if (btnNettoyer) {
-        btnNettoyer.onclick = () => emit('nettoyer-signalement', sig)
+      // Recentrer doucement la carte pour laisser de la place à la Bottom Sheet
+      if (mapInstance) {
+        mapInstance.panTo([Number(sig.latitude) + 0.005, Number(sig.longitude)], { animate: true, duration: 0.4 })
       }
     })
 
-    markersLayer.addLayer(marker)
+    marker.addTo(markersLayer)
   })
+}
+
+function afficherMarqueurUtilisateur(lat, lng) {
+  if (!mapInstance) return
+  if (userMarker) {
+    userMarker.setLatLng([lat, lng])
+    return
+  }
+
+  // Point bleu pulsant pour la position utilisateur
+  const userIcon = L.divIcon({
+    className: 'user-location-pulse',
+    html: '<div class="pulse-ring"></div><div class="pulse-center"></div>',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11]
+  })
+
+  userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(mapInstance)
+}
+
+function recentrerSurPosition() {
+  if (props.userPosition?.latitude && props.userPosition?.longitude && mapInstance) {
+    mapInstance.flyTo([props.userPosition.latitude, props.userPosition.longitude], 15, { duration: 1 })
+    return
+  }
+
+  // Demander la géolocalisation si non encore obtenue
+  if ('geolocation' in navigator) {
+    isLocating.value = true
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        isLocating.value = false
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        afficherMarqueurUtilisateur(lat, lng)
+        if (mapInstance) {
+          mapInstance.flyTo([lat, lng], 15, { duration: 1 })
+        }
+      },
+      (err) => {
+        isLocating.value = false
+        console.warn('Erreur geoloc recentrage:', err)
+        // Recentrer sur Bujumbura par défaut
+        if (mapInstance) {
+          mapInstance.flyTo(MAP_CONFIG.defaultCenter, 13, { duration: 0.8 })
+        }
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
+  }
+}
+
+function getStatusConfig(statut) {
+  const s = normaliserStatut(statut)
+  return MAP_CONFIG.statusConfig[s] || MAP_CONFIG.statusConfig.en_attente
+}
+
+function fermerFiche() {
+  selectedSignalement.value = null
+}
+
+function allerAuDetail(id) {
+  router.push(`/signalement/${id}`)
+}
+
+function formaterDate(dateStr) {
+  if (!dateStr) return 'Récemment'
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  } catch {
+    return 'Récemment'
+  }
 }
 </script>
 
 <style scoped>
-.carte-interactive-wrapper {
+.carte-interactive-container {
   position: relative;
   width: 100%;
-  height: 540px;
-  border-radius: 12px;
+  height: 100%;
   overflow: hidden;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-.map-container {
+.map-viewport {
   width: 100%;
   height: 100%;
-  background-color: #0f172a;
+  z-index: 10;
+  background-color: #EBF4F9;
 }
 
-/* Légende Flottante */
-.map-legend {
+/* Bouton Flottant Recentrer (Locate) */
+.btn-locate-user {
   position: absolute;
-  bottom: 1.25rem;
-  right: 1.25rem;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #f8fafc;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  z-index: 1000;
-  max-width: 290px;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.35);
-}
-
-.legend-header {
+  right: 14px;
+  bottom: 24px;
+  z-index: 500;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 1.5px solid var(--color-border, #E5E9E2);
+  color: var(--color-primary, #1F4D3A);
   display: flex;
-  justify-content: space-between;
   align-items: center;
-}
-
-.legend-title {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: #94a3b8;
-}
-
-.legend-toggle {
-  background: none;
-  border: none;
-  color: #94a3b8;
-  font-size: 1.1rem;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   cursor: pointer;
-  line-height: 1;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  -webkit-tap-highlight-color: transparent;
 }
 
-.legend-items {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.65rem;
+.btn-locate-user:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
 }
 
-.legend-item {
+.locate-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.btn-locate-user.locating .locate-icon {
+  animation: spin 1s linear infinite;
+}
+
+/* Légende Flottante Repliable */
+.floating-legend {
+  position: absolute;
+  left: 14px;
+  bottom: 24px;
+  z-index: 500;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border, #E5E9E2);
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  max-width: 230px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.legend-header-btn {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0.55rem 0.75rem;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.45rem;
+  font-family: var(--font-title);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text, #0F172A);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.legend-pin-img {
-  width: 20px;
-  height: 26px;
+.legend-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--color-primary, #1F4D3A);
   flex-shrink: 0;
 }
 
-.legend-text {
+.legend-chevron {
+  margin-left: auto;
+  font-size: 0.65rem;
+  color: var(--color-text-muted, #64748B);
+}
+
+.legend-body {
+  padding: 0.4rem 0.75rem 0.65rem;
+  border-top: 1px solid #F1F5F9;
   display: flex;
   flex-direction: column;
+  gap: 0.45rem;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-pin {
+  width: 16px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.legend-category-pin {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 2px solid white;
+  border-radius: 50%;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 800;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
+}
+
+.legend-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
 }
 
 .legend-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #f1f5f9;
-  line-height: 1.2;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .legend-desc {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  line-height: 1.15;
+  font-size: 0.65rem;
+  color: var(--color-text-muted, #64748B);
+}
+
+/* Fiche Flottante (Bottom Sheet) */
+.bottom-sheet-card {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 600;
+  background: #FFFFFF;
+  border: 1px solid var(--color-border, #E5E9E2);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  padding: 0.85rem;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.btn-close-sheet {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #F1F5F9;
+  border: none;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #64748B);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+  z-index: 10;
+}
+
+.btn-close-sheet:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.sheet-content {
+  display: flex;
+  gap: 0.85rem;
+}
+
+.sheet-thumb-wrapper {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sheet-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sheet-category-tag {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: #FFFFFF;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 4px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.sheet-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.sheet-status-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.sheet-distance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-primary, #1F4D3A);
+  background: var(--color-primary-light, #EBF3EF);
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+}
+
+.sheet-description {
+  font-size: 0.8rem;
+  color: var(--color-text, #0F172A);
+  line-height: 1.3;
+  margin-bottom: 0.4rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sheet-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.sheet-date {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #64748B);
+}
+
+.btn-voir-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background-color: var(--color-primary, #1F4D3A);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+  font-family: var(--font-title);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-voir-detail:hover {
+  background-color: var(--color-primary-hover, #163a2c);
+}
+
+/* Animations */
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(20px);
+  opacity: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>
 
 <style>
-.custom-map-popup .popup-thumb {
-  width: 100%;
-  height: 110px;
-  object-fit: cover;
-  border-radius: 6px;
-  margin-bottom: 0.25rem;
+/* Style global injecté pour l'épingle utilisateur pulsante Leaflet */
+.user-location-pulse {
+  position: relative;
+}
+
+.pulse-center {
+  width: 14px;
+  height: 14px;
+  background-color: #2563EB;
+  border: 2px solid #FFFFFF;
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  position: absolute;
+  top: 4px;
+  left: 4px;
+}
+
+.pulse-ring {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: rgba(37, 99, 235, 0.35);
+  animation: userPulse 2s ease-out infinite;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+@keyframes userPulse {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Attribution Leaflet discrète et élégante */
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  color: #94A3B8 !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(4px);
+  padding: 2px 6px !important;
+}
+.leaflet-control-attribution a {
+  color: #64748B !important;
+  text-decoration: none;
 }
 </style>

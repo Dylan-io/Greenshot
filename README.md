@@ -1,6 +1,6 @@
-# CleanShoot 🌍🌱
+# Greenshot 🌍🌱
 
-CleanShoot est une application web citoyenne ClimateTech conçue pour le Burundi. Elle permet aux citoyens de signaler des problèmes environnementaux (déchets plastiques, décharges sauvages, pollution) via photo et géolocalisation, avec un système de score et de classement pour stimuler l'engagement civique.
+Greenshot est une application web citoyenne ClimateTech conçue pour le Burundi. Elle permet aux citoyens de signaler des problèmes environnementaux (déchets plastiques, décharges sauvages, pollution) via photo et géolocalisation, avec un système de score et de classement pour stimuler l'engagement civique.
 
 L'objectif à terme est de produire des données environnementales fiables, géolocalisées et exploitables pour les ONG, les bailleurs de fonds (PNUD, GEF) et les institutions publiques.
 
@@ -9,7 +9,7 @@ L'objectif à terme est de produire des données environnementales fiables, géo
 ## 📁 Structure du Monorepo
 
 ```
-cleanshoot/
+greenshot/
 ├── frontend/    # Application Web Vue 3 (Vite, Pinia, Leaflet, Supabase Client)
 ├── backend/     # Scripts Supabase (Migrations PostgreSQL/PostGIS, RLS, Fonctions SQL)
 ├── docs/        # Documentation de référence (Projet, Schéma DB, Conventions)

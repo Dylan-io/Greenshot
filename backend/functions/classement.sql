@@ -19,8 +19,13 @@ RETURNS TABLE (
 LANGUAGE sql
 SECURITY DEFINER
 STABLE
+SET search_path = public, pg_temp
 AS $$
-    SELECT 
+    -- Leaderboard : score total = points signalement + points nettoyage.
+    -- SECURITY DEFINER car elle agrège des lignes que le RLS filtrerait
+    -- ligne par ligne ; elle ne retourne que des colonnes déjà publiques
+    -- (aucune donnée personnelle). search_path verrouillé.
+    SELECT
         DENSE_RANK() OVER (ORDER BY (p.score_signalement + p.score_nettoyage) DESC, p.score_nettoyage DESC) AS rang,
         p.id,
         p.nom,

@@ -15,16 +15,18 @@ const props = defineProps({
 })
 
 const statutClass = computed(() => {
-  if (props.statut === 'traité') return 'traite'
-  if (props.statut === 'nettoyé') return 'nettoye'
-  if (props.statut === 'vu') return 'vu'
+  const s = (props.statut || '').toLowerCase().replace('_', ' ')
+  if (s.includes('trait')) return 'traite'
+  if (s.includes('nettoy')) return 'nettoye'
+  if (s.includes('vu')) return 'vu'
   return 'en-attente'
 })
 
 const statutTexte = computed(() => {
-  if (props.statut === 'traité') return 'Traité'
-  if (props.statut === 'nettoyé') return 'Nettoyé'
-  if (props.statut === 'vu') return 'Vu'
+  const s = (props.statut || '').toLowerCase().replace('_', ' ')
+  if (s.includes('trait')) return 'Traité'
+  if (s.includes('nettoy')) return 'Nettoyé'
+  if (s.includes('vu')) return 'Vu'
   return 'En attente'
 })
 </script>
