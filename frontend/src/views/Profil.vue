@@ -642,18 +642,14 @@ async function confirmerDeconnexion() {
 
   deconnexionEnCours.value = true
   try {
-    if (supabaseConfigured) {
-      await supabase.auth.signOut()
-    }
-    userStore.clearSession()
+    await userStore.deconnecter()
     afficherToast('Déconnexion réussie')
 
     setTimeout(() => {
       router.push('/')
-    }, 500)
+    }, 400)
   } catch (err) {
     console.warn('Erreur lors de la déconnexion:', err)
-    userStore.clearSession()
     router.push('/')
   } finally {
     deconnexionEnCours.value = false
