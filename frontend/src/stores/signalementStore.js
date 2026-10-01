@@ -187,7 +187,11 @@ export const useSignalementStore = defineStore('signalement', () => {
 
   async function compresserImage(fichier) {
     const options = {
-      maxSizeMB: 1.0, // Cible Greenshot Burundi : max 1 Mo
+      // Le bucket `signalements-photos` refuse tout fichier > 1 Mo
+      // (file_size_limit). Viser exactement 1 Mo ne laisse aucune marge :
+      // le moindre octet d'en-tête suffit à faire rejeter l'upload alors que
+      // la compression a réussi. On vise 0.8 Mo.
+      maxSizeMB: 0.8,
       maxWidthOrHeight: 1280, // Largeur/Hauteur max 1280px pour économiser la data
       useWebWorker: true,
       fileType: 'image/jpeg'
@@ -206,8 +210,12 @@ export const useSignalementStore = defineStore('signalement', () => {
     const ext = fichier.name?.split('.').pop() || 'jpg'
     const nomFichier = `signalement_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`
 
-    // Essai prioritaire sur le bucket : 'photos-signalements', avec fallback 'signalements-photos'
-    const bucketsPossibles = ['photos-signalements', 'signalements-photos']
+    // Le bucket qui existe est `signalements-photos` (créé par
+    // backend/policies/storage_policies.sql). `photos-signalements` n'a jamais
+    // été créé : le tenter d'abord ne faisait qu'ajouter un upload voué à
+    // l'échec avant le bon. Nom conservé en repli pour un environnement
+    // existant qui l'aurait déjà déployé.
+    const bucketsPossibles = ['signalements-photos', 'photos-signalements']
     let uploadSucces = false
     let urlPublique = ''
     let dernierErreur = null
@@ -259,6 +267,23 @@ export const useSignalementStore = defineStore('signalement', () => {
       return { success: false, error: messageErreurEnvoi.value }
     }
 
+    // L'ID auteur est résolu AVANT toute compression/upload : le faire après
+    // laissait des photos orphelines dans le bucket à chaque envoi refusé.
+    // Il n'existe plus de mode démo : on ne peut plus attribuer le signalement
+    // à un profil tiers ni à un UUID fictif (ce qui aurait forgé la paternité
+    // d'un signalement au nom d'un citoyen, et échoué sur la clé étrangère
+    // vers auth.users de toute façon).
+    let userId = userStore?.user?.id
+    if (!userId) {
+      const { data: sessionData } = await supabase.auth.getSession()
+      userId = sessionData?.session?.user?.id || null
+    }
+
+    if (!userId) {
+      messageErreurEnvoi.value = 'Vous devez être connecté pour déposer un signalement. Vos données et votre photo sont conservées : reconnectez-vous puis renvoyez.'
+      return { success: false, error: messageErreurEnvoi.value }
+    }
+
     envoiEnCours.value = true
     messageErreurEnvoi.value = ''
     estErreurReseau.value = false
@@ -274,47 +299,6 @@ export const useSignalementStore = defineStore('signalement', () => {
 
       // 3. Déterminer l'ID utilisateur
       etapeEnvoi.value = 'enregistrement'
-      let userId = userStore?.user?.id
-
-      if (!userId) {
-        // Vérifier session Supabase active
-        const { data: sessionData } = await supabase.auth.getSession()
-        if (sessionData?.session?.user) {
-          userId = sessionData.session.user.id
-          if (userStore?.setSession) {
-            userStore.setSession(sessionData.session.user)
-          }
-        }
-      }
-
-      // Si pas encore d'utilisateur connecté, tenter de récupérer un profil démo ou créer session anonyme
-      if (!userId) {
-        try {
-          const { data: anonData } = await supabase.auth.signInAnonymously()
-          if (anonData?.user) {
-            userId = anonData.user.id
-          }
-        } catch {
-          // Supabase Auth anonyme pas activée
-        }
-      }
-
-      // Si toujours aucun utilisateur connecté, tenter le profil utilisateur par défaut
-      if (!userId) {
-        // En mode démo / premier test sans compte connecté
-        const { data: premierProfil } = await supabase
-          .from('profiles')
-          .select('id')
-          .limit(1)
-          .maybeSingle()
-
-        if (premierProfil?.id) {
-          userId = premierProfil.id
-        } else {
-          // Identifiant démo par défaut
-          userId = '00000000-0000-0000-0000-000000000000'
-        }
-      }
 
       // Vérifier si la catégorie est un UUID valide (au cas où on est sur les IDs de secours 'cat-plastique')
       let idCategorieFinale = categorieId.value
@@ -464,8 +448,18 @@ export const useSignalementStore = defineStore('signalement', () => {
     chargementSignalements.value = true
     erreurSignalements.value = null
 
+    // Données de démonstration : UNIQUEMENT en développement local.
+    // En production, ces signalements fictifs s'afficheraient sur la carte avec
+    // de vraies coordonnées de Bujumbura et de vraies photos de décharges : un
+    // citoyen ou un bailleur les prendrait pour de vrais signalements, ce qui
+    // est inacceptable pour un projet dont la promesse est la fiabilité de la
+    // donnée (garde ajoutée côté dev, appliqué ici à la source unique qu'est
+    // le store — Carte.vue, Profil.vue et le détail consomment tous cette liste).
+    const demoAutorisee = import.meta.env.DEV
+    const signalementsDemo = () => (demoAutorisee ? SIGNALEMENTS_DEMO : [])
+
     if (!supabaseConfigured) {
-      listeSignalements.value = SIGNALEMENTS_DEMO
+      listeSignalements.value = signalementsDemo()
       chargementSignalements.value = false
       return listeSignalements.value
     }
@@ -481,14 +475,14 @@ export const useSignalementStore = defineStore('signalement', () => {
       if (data && data.length > 0) {
         listeSignalements.value = data
       } else {
-        // Si la base est encore vide, charger les signalements démo de qualité
-        listeSignalements.value = SIGNALEMENTS_DEMO
+        // Base vide : on reste sur la liste vide en production
+        listeSignalements.value = signalementsDemo()
       }
     } catch (err) {
-      console.warn('Erreur chargement Supabase signalements, utilisation données de démonstration:', err)
+      console.warn('Erreur chargement Supabase signalements:', err)
       erreurSignalements.value = err.message || 'Impossible de joindre le serveur'
       if (listeSignalements.value.length === 0) {
-        listeSignalements.value = SIGNALEMENTS_DEMO
+        listeSignalements.value = signalementsDemo()
       }
     } finally {
       chargementSignalements.value = false

@@ -12,6 +12,7 @@ CREATE OR REPLACE FUNCTION public.soumettre_preuve_nettoyage(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_signalement public.signalements%ROWTYPE;
@@ -40,9 +41,11 @@ BEGIN
     END IF;
 
     -- 4. Calcul de la distance géodésique avec PostGIS (en mètres)
-    v_distance := ST_Distance(
+    -- PostGIS est installé dans le schema 'extensions' : qualification
+    -- explicite obligatoire maintenant que search_path est verrouillé.
+    v_distance := extensions.ST_Distance(
         v_signalement.location,
-        ST_SetSRID(ST_MakePoint(p_longitude, p_latitude), 4326)::geography
+        extensions.ST_SetSRID(extensions.ST_MakePoint(p_longitude, p_latitude), 4326)::extensions.geography
     );
 
     -- 5. Règle anti-fraude : distance maximale autorisée de 50 mètres
@@ -66,6 +69,12 @@ BEGIN
     v_ancien_statut := v_signalement.statut;
 
     -- 7. Mettre à jour le signalement
+    -- L'historisation est désormais automatique via le trigger
+    -- handle_statut_change (AFTER UPDATE OF statut). Ne PAS insérer
+    -- manuellement ici, sinon la timeline contient deux lignes identiques.
+    -- BUG 5b : avant, seules la création et ce RPC écrivaient dans
+    -- l'historique, donc les transitions en_attente → vu → traite n'y
+    -- apparaissaient jamais et la timeline avait des trous.
     UPDATE public.signalements
     SET 
         photo_apres_url = p_photo_apres_url,
@@ -74,11 +83,7 @@ BEGIN
         statut = 'nettoye'
     WHERE id = p_signalement_id;
 
-    -- 8. Historiser le statut dans statuts_historique
-    INSERT INTO public.statuts_historique (signalement_id, ancien_statut, nouveau_statut, date)
-    VALUES (p_signalement_id, v_ancien_statut, 'nettoye', timezone('utc'::text, now()));
-
-    -- 9. Créditer les points de nettoyage au profil du nettoyeur
+    -- 8. Créditer les points de nettoyage au profil du nettoyeur
     UPDATE public.profiles
     SET score_nettoyage = score_nettoyage + v_points_nettoyage
     WHERE id = v_nettoyeur_id;

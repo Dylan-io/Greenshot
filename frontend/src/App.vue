@@ -1,69 +1,84 @@
 <template>
   <div id="greenshot-app">
-    <!-- En-tête mobile Greenshot -->
+    <!-- Barre de navigation principale Greenshot -->
     <header class="app-header">
       <div class="header-container">
-        <router-link to="/" class="brand-link" aria-label="Accueil Greenshot">
-          <!-- Logo : icône feuille dans un carré arrondi vert forêt #1F4D3A -->
-          <div class="logo-box">
-            <svg class="leaf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 20A7 7 0 0 1 4 13c0-4 3-7 8-9 5 2 8 5 8 9a7 7 0 0 1-7 7z"/>
-              <path d="M12 4v16"/>
-            </svg>
-          </div>
-          <span class="brand-title">Green<span>shot</span></span>
+        <router-link to="/" class="logo-link">
+          <h1 class="logo">Green<span>shot</span> 🌍</h1>
         </router-link>
-
-        <!-- Badge discret de contexte pays -->
-        <div class="header-badge">
-          <span class="badge-flag">🇧🇮</span>
-          <span class="badge-country">Burundi</span>
-        </div>
+        <nav class="main-nav">
+          <router-link to="/">Signaler</router-link>
+          <router-link to="/carte">Carte</router-link>
+          <router-link to="/nettoyage" class="nav-clean">Nettoyer 🧹</router-link>
+          <router-link to="/classement">Classement</router-link>
+          <router-link to="/profil">Profil</router-link>
+          <!-- Lien auth : se connecter ou s'inscrire -->
+          <template v-if="!isAuthenticated">
+            <router-link to="/connexion" class="nav-auth">Connexion</router-link>
+            <router-link to="/inscription" class="nav-auth nav-inscription">S'inscrire</router-link>
+          </template>
+          <template v-else>
+            <span class="nav-user">👤 {{ profile.username || profile.nom }}</span>
+            <button @click="deconnecter" class="btn-deconnexion">Déconnexion</button>
+          </template>
+        </nav>
       </div>
     </header>
 
-    <!-- Contenu principal scrollable avec padding de sécurité pour la barre du bas -->
+    <!-- Bannière de vérification email si nécessaire -->
+    <div v-if="isAuthenticated && !profile.email_verified" class="verification-banner">
+      ⚠️ <strong>Votre email n'est pas encore vérifié.</strong> 
+      Vous pouvez naviguer sur l'application, mais pour <strong>signaler un problème</strong>, 
+      vous devez cliquer sur le lien dans l'email que nous vous avons envoyé.
+      <button @click="renvoyerVerification" class="btn-resend-verify">📧 Renvoyer l'email</button>
+    </div>
+
+    <!-- Avertissement si email non vérifié et page de signalement -->
+    <div v-if="isAuthenticated && !profile.email_verified && isOnSignalementPage" class="verification-warning">
+      ⛔ Vous devez vérifier votre email pour soumettre un signalement.
+    </div>
+
     <main class="app-content">
       <router-view />
     </main>
-
-    <!-- Barre de navigation mobile-first en bas (BottomNav) -->
-    <BottomNav />
   </div>
 </template>
 
 <script setup>
-import BottomNav from './components/BottomNav.vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from './stores/userStore'
+
+const router = useRouter()
+const userStore = useUserStore()
+
+const { user, profile, isAuthenticated } = userStore
+
+// Initialiser l'authentification au montage
+onMounted(() => {
+  userStore.initAuth()
+})
+
+// Vérifier si on est sur une page de signalement
+const isOnSignalementPage = computed(() => {
+  return router.currentRoute.value.path === '/' || 
+         router.currentRoute.value.path === '/nettoyage'
+})
+
+// Se déconnecter
+async function deconnecter() {
+  await userStore.deconnecter()
+  router.push('/connexion')
+}
+
+// Renvoyer l'email de vérification
+async function renvoyerVerification() {
+  await userStore.renvoyerVerification()
+}
 </script>
 
 <style>
-:root {
-  /* Charte Greenshot officielle */
-  --color-bg: #F6F8F3;
-  --color-primary: #1F4D3A;        /* Vert forêt pour action principale & actif */
-  --color-primary-hover: #163a2c;
-  --color-primary-light: #EBF3EF;
-  --color-amber: #E8A33D;          /* Ambre pour points & gamification */
-  --color-amber-light: #FDF6EB;
-  --color-terracotta: #B5502F;     /* Terre cuite pour alertes & en attente */
-  --color-terracotta-light: #FDF0EC;
-  --color-card: #FFFFFF;
-  --color-text: #0F172A;
-  --color-text-muted: #64748B;
-  --color-border: #E5E9E2;
-
-  --font-title: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-full: 9999px;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
-}
-
-/* Reset général */
+/* Reset & typographie moderne */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -71,105 +86,159 @@ import BottomNav from './components/BottomNav.vue'
 }
 
 body {
-  font-family: var(--font-body);
-  background-color: var(--color-bg);
-  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
   -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
 }
 
-h1, h2, h3, h4, .font-title {
-  font-family: var(--font-title);
-  letter-spacing: -0.02em;
-}
-
-#greenshot-app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* En-tête Greenshot */
 .app-header {
-  background-color: #FFFFFF;
-  border-bottom: 1px solid var(--color-border);
-  padding: 0.65rem 1rem;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.75rem 1rem;
   position: sticky;
   top: 0;
-  z-index: 900;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  z-index: 1000;
 }
 
 .header-container {
-  max-width: 480px;
+  max-width: 960px;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.brand-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
+.logo-link {
   text-decoration: none;
 }
 
-/* Logo : icône feuille dans un carré arrondi vert forêt #1F4D3A */
-.logo-box {
-  width: 34px;
-  height: 34px;
-  background-color: var(--color-primary, #1F4D3A);
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #FFFFFF;
-  box-shadow: 0 2px 6px rgba(31, 77, 58, 0.25);
-}
-
-.leaf-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.brand-title {
-  font-family: var(--font-title);
+.logo {
   font-size: 1.25rem;
   font-weight: 800;
-  color: var(--color-primary, #1F4D3A);
-  letter-spacing: -0.03em;
+  color: #0f172a;
 }
 
-.brand-title span {
-  color: var(--color-amber, #E8A33D);
+.logo span {
+  color: #10b981;
 }
 
-.header-badge {
-  display: inline-flex;
+.main-nav {
+  display: flex;
+  gap: 0.5rem;
   align-items: center;
-  gap: 0.35rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: 0.2rem 0.6rem;
-  font-size: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.main-nav a {
+  text-decoration: none;
+  color: #64748b;
   font-weight: 600;
-  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
 }
 
-/* Contenu scrollable Mobile-First avec padding de sécurité pour la BottomNav */
-.app-content {
-  max-width: 480px;
-  width: 100%;
+.main-nav a:hover {
+  color: #0f172a;
+  background-color: #f1f5f9;
+}
+
+.main-nav a.router-link-active {
+  color: #10b981;
+  background-color: #ecfdf5;
+}
+
+.main-nav a.nav-clean.router-link-active {
+  color: #c07912;
+  background-color: #fdf6eb;
+}
+
+/* Lien auth dans la nav */
+.nav-auth {
+  color: #64748b !important;
+}
+
+.nav-auth.router-link-active {
+  color: #10b981 !important;
+  background-color: #ecfdf5 !important;
+}
+
+.nav-inscription {
+  background-color: #10B981 !important;
+  color: white !important;
+  border-radius: 6px;
+}
+
+.nav-user {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.btn-deconnexion {
+  padding: 0.3rem 0.65rem;
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.btn-deconnexion:hover {
+  background-color: #FEF2F2;
+  color: #991B1B;
+  border-color: #FECACA;
+}
+
+/* Bannière de vérification email */
+.verification-banner {
+  background: #FFFBEB;
+  border-bottom: 1px solid #FCD34D;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #92400E;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 1rem 1rem calc(76px + env(safe-area-inset-bottom, 16px));
-  flex: 1;
 }
 
-@media (min-width: 481px) {
-  .app-content {
-    padding-top: 1.25rem;
-  }
+.verification-banner strong {
+  font-weight: 700;
+}
+
+.btn-resend-verify {
+  padding: 0.25rem 0.75rem;
+  background: #E8A33D;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+/* Avertissement sur la page de signalement */
+.verification-warning {
+  max-width: 960px;
+  margin: 0.5rem auto;
+  padding: 0.75rem 1rem;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  color: #991B1B;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.app-content {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem;
 }
 </style>

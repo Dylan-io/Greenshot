@@ -462,14 +462,8 @@ async function soumettreSignalement() {
     }
 
     if (!currentUserId) {
-      const { data: anonymousData, error: anonymousError } = await supabase.auth.signInAnonymously()
-      if (anonymousError) {
-        throw new Error('Une session Supabase est nécessaire pour envoyer. Activez Authentification anonyme dans Supabase ou connectez-vous.')
-      }
-      currentUserId = anonymousData.user?.id
+      throw new Error('Vous devez être connecté pour envoyer un signalement.')
     }
-
-    if (!currentUserId) throw new Error('Impossible d’obtenir une session utilisateur Supabase.')
 
     let categorieIdFinale = categorieChoisie.value
     const categorieEstUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categorieIdFinale)

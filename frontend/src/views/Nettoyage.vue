@@ -438,8 +438,12 @@ const userStore = useUserStore()
 const RAYON_ANTI_FRAUDE_M = 20
 // Durée de validité d'un relevé GPS avant la prise de photo
 const DELAI_VALIDITE_POSITION_MS = 2 * 60 * 1000
-// Même ordre de tentative que le store signalement (bucket principal puis historique)
-const BUCKETS_PHOTOS = ['photos-signalements', 'signalements-photos']
+// Le bucket qui existe est `signalements-photos` (créé par
+// backend/policies/storage_policies.sql). `photos-signalements` n'a jamais été
+// créé : le tester en premier ne faisait qu'ajouter un upload voué à l'échec
+// et un nom de bucket trompant dans les messages d'erreur. On garde le nom en
+// repli pour un environnement existant qui l'aurait déjà déployé.
+const BUCKETS_PHOTOS = ['signalements-photos', 'photos-signalements']
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const videoElement = ref(null)
@@ -1034,8 +1038,11 @@ async function confirmerNettoyage() {
 }
 
 /**
- * Retrouve (ou crée en mode anonyme) la session du nettoyeur et la memorize
- * dans le store pour que Profil / Classement restent cohérents après le gain.
+ * Retrouve la session du nettoyeur et s'assure que le store en est informé.
+ * Le RPC soumettre_preuve_nettoyage est SECURITY DEFINER et attribue la preuve
+ * via auth.uid() : sans session réelle, la preuve est comptée pour personne.
+ * On ne recourt donc plus à l'authentification anonyme (qui créait une session
+ * fantôme distincte de celle du citizen) ni à un profil de substitution.
  */
 async function resoudreNettoyeur() {
   let utilisateur = userStore.user || null
@@ -1047,22 +1054,24 @@ async function resoudreNettoyeur() {
   }
 
   if (!utilisateur) {
-    const { data: anonymousData, error: anonymousError } = await supabase.auth.signInAnonymously()
-    if (anonymousError || !anonymousData?.user) {
-      throw new Error('Connectez-vous ou activez l’authentification anonyme pour soumettre la preuve.')
-    }
-    utilisateur = anonymousData.user
+    throw new Error('Connectez-vous pour soumettre la preuve de nettoyage. Votre photo est conservée : reconnectez-vous puis renvoyez.')
   }
 
-  if (!utilisateur) throw new Error('Session Supabase introuvable. Connectez-vous avant de soumettre le nettoyage.')
+  // Le store peut être en retard sur la session (page ouverte avant la
+  // connexion) : on recharge le profil via le RPC plutôt que de l'injecter.
+  if (!userStore.profile?.nom) {
+    await userStore.chargerProfile()
+  }
 
-  userStore.setSession(utilisateur, userStore.profile)
   return utilisateur
 }
 
 async function compresserPhoto(fichier) {
   const options = {
-    maxSizeMB: 1.0,
+    // Marge sous la limite de 1 Mo du bucket `signalements-photos` (voir
+    // backend/policies/storage_policies.sql) : viser 1.0 exactement fait échouer
+    // l'upload sur les quelques octets d'en-tête.
+    maxSizeMB: 0.8,
     maxWidthOrHeight: 1280,
     useWebWorker: true,
     fileType: 'image/jpeg'
@@ -1107,33 +1116,15 @@ async function uploaderPhotoApres(nomFichier, fichier) {
 }
 
 async function majProfilNettoyeur(utilisateur, pointsGagnes) {
-  const profilActuel = userStore.profile || {}
-  const scoreSignalement = Number(profilActuel.score_signalement) || 0
-  const scoreNettoyage = Number(profilActuel.score_nettoyage) || 0
-
-  // Mise à jour optimiste pour un affichage instantané du gain
-  userStore.setSession(utilisateur, {
-    ...profilActuel,
-    score_signalement: scoreSignalement,
-    score_nettoyage: scoreNettoyage + pointsGagnes,
-    score_total: scoreSignalement + scoreNettoyage + pointsGagnes
-  })
-
   if (!supabaseConfigured || !utilisateur?.id) return
 
+  // Le RPC soumettre_preuve_nettoyage a déjà crédité les points côté serveur :
+  // on relit le profil via obtenir_mon_profil() pour que Profil et Classement
+  // repartent de la valeur autoritaire. On ne relit plus `profiles` en direct
+  // (colonnes de score non accordées au rôle client) et on n'écrit plus un
+  // score optimiste localement, qui pouvait masquer un refus du RPC.
   try {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, nom, ville, score_signalement, score_nettoyage')
-      .eq('id', utilisateur.id)
-      .maybeSingle()
-
-    if (data) {
-      userStore.setSession(utilisateur, {
-        ...data,
-        score_total: (Number(data.score_signalement) || 0) + (Number(data.score_nettoyage) || 0)
-      })
-    }
+    await userStore.chargerProfile()
   } catch (err) {
     console.warn('⚠️ [Nettoyage] Resynchronisation du profil impossible:', err)
   }

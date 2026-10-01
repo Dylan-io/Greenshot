@@ -4,7 +4,8 @@
 -- ==============================================================================
 
 -- Activation de l'extension spatiale PostGIS si non présente
-CREATE EXTENSION IF NOT EXISTS postgis;
+-- Installée dans le schema 'extensions' (convention Supabase)
+CREATE EXTENSION IF NOT EXISTS postgis SCHEMA extensions;
 
 CREATE TABLE IF NOT EXISTS public.signalements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -19,6 +20,11 @@ CREATE TABLE IF NOT EXISTS public.signalements (
     location GEOGRAPHY(Point, 4326) GENERATED ALWAYS AS (
         ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography
     ) STORED,
+    -- Ville / commune du LIEU DU SIGNALEMENT (et non du profil).
+    -- Distinction importante : un habitant de Gitega peut signaler a Rohero.
+    -- Alimentee par le formulaire (FormSignalement.vue), consommee par le
+    -- filtre "ville" de la carte et l'affichage sous les epingles.
+    ville TEXT,
     description TEXT,
     statut TEXT NOT NULL DEFAULT 'en_attente' CHECK (statut IN ('en_attente', 'vu', 'nettoye', 'traite')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
@@ -30,3 +36,5 @@ CREATE INDEX IF NOT EXISTS idx_signalements_statut ON public.signalements (statu
 CREATE INDEX IF NOT EXISTS idx_signalements_categorie ON public.signalements (categorie_id);
 CREATE INDEX IF NOT EXISTS idx_signalements_user ON public.signalements (user_id);
 CREATE INDEX IF NOT EXISTS idx_signalements_nettoyeur ON public.signalements (nettoye_par_user_id);
+-- Filtre "ville" de la carte + affichage de la localisation sous les epingles
+CREATE INDEX IF NOT EXISTS idx_signalements_ville ON public.signalements (ville);
