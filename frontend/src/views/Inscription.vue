@@ -378,14 +378,18 @@ async function soumettreInscription() {
 
     if (error) {
       const errMsg = (error.message || '').toLowerCase()
-      if (errMsg.includes('already') || errMsg.includes('registered') || errMsg.includes('exists')) {
+      if (errMsg.includes('rate limit') || errMsg.includes('too many') || error.status === 429) {
+        messageErreur.value = '⏳ Trop de tentatives d\'inscription récentes. Le serveur limite les envois d\'emails. Veuillez patienter 1 heure puis réessayer, ou contactez votre administrateur.'
+      } else if (errMsg.includes('already') || errMsg.includes('registered') || errMsg.includes('exists')) {
         messageErreur.value = 'Cette adresse email est déjà associée à un compte Greenshot. Veuillez vous connecter.'
       } else if (errMsg.includes('weak') || errMsg.includes('password')) {
-        messageErreur.value = 'Le mot de passe choisi est trop simple. Choisissez un mot de passe plus robuste.'
+        messageErreur.value = 'Le mot de passe choisi est trop simple. Choisissez un mot de passe plus robuste (8+ caractères avec lettres et chiffres).'
+      } else if (errMsg.includes('not_confirmed') || errMsg.includes('email not confirmed')) {
+        messageErreur.value = 'Votre adresse email n\'est pas encore confirmée. Vérifiez votre boîte de réception (et les spams) pour le lien de confirmation.'
       } else if (errMsg.includes('network') || errMsg.includes('fetch')) {
         messageErreur.value = 'Connexion internet instable. Veuillez vérifier votre réseau.'
       } else {
-        messageErreur.value = 'Impossible de créer le compte pour le moment. Veuillez vérifier vos données et réessayer.'
+        messageErreur.value = `Impossible de créer le compte : ${error.message || 'erreur inconnue'}. Veuillez réessayer.`
       }
       return
     }

@@ -288,12 +288,16 @@ async function soumettreConnexion() {
     if (error) {
       // Sécurité basique : ne jamais préciser si c'est l'email ou le mot de passe qui est faux
       const errMsg = (error.message || '').toLowerCase()
-      if (errMsg.includes('invalid') || errMsg.includes('credentials') || errMsg.includes('grant')) {
+      if (errMsg.includes('rate limit') || errMsg.includes('too many') || error.status === 429) {
+        messageErreur.value = '⏳ Trop de tentatives de connexion. Veuillez patienter quelques minutes avant de réessayer.'
+      } else if (errMsg.includes('email not confirmed') || errMsg.includes('not_confirmed')) {
+        messageErreur.value = '📧 Votre adresse email n\'est pas encore confirmée. Vérifiez votre boîte de réception (et les spams) pour le lien de confirmation Greenshot.'
+      } else if (errMsg.includes('invalid') || errMsg.includes('credentials') || errMsg.includes('grant')) {
         messageErreur.value = 'Adresse email ou mot de passe incorrect. Veuillez vérifier vos identifiants.'
       } else if (errMsg.includes('network') || errMsg.includes('fetch')) {
         messageErreur.value = 'Connexion internet instable ou inaccessible. Veuillez vérifier votre réseau.'
       } else {
-        messageErreur.value = 'Impossible de se connecter pour le moment. Veuillez réessayer.'
+        messageErreur.value = `Impossible de se connecter : ${error.message || 'erreur inconnue'}. Veuillez réessayer.`
       }
       return
     }

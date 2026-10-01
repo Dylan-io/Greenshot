@@ -182,10 +182,12 @@ export const useUserStore = defineStore('user', () => {
   }
 
   // Renvoyer l'email de vérification
+  // NOTE: supabase-js v2 utilise supabase.auth.resend(), PAS resendVerificationEmail()
   async function renvoyerVerification() {
     const targetEmail = profile.value.email || user.value?.email
     if (!targetEmail) return { error: new Error('Aucune adresse email trouvée.') }
-    const { data, error } = await supabase.auth.resendVerificationEmail({
+    const { data, error } = await supabase.auth.resend({
+      type: 'signup',
       email: targetEmail
     })
     return { data, error }
