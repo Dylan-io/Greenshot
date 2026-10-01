@@ -1,20 +1,26 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import Accueil from '../views/Accueil.vue'
 import Signalement from '../views/Signalement.vue'
 import Carte from '../views/Carte.vue'
 import Nettoyage from '../views/Nettoyage.vue'
 import Classement from '../views/Classement.vue'
 import DetailSignalement from '../views/DetailSignalement.vue'
 import Profil from '../views/Profil.vue'
-// ⚠️ Pages d'authentification - Créées par l'agent IA
-// À valider avec l'équipe frontend
 import Inscription from '../views/Inscription.vue'
 import Connexion from '../views/Connexion.vue'
+import { useUserStore } from '../stores/userStore'
 
 const routes = [
   {
     path: '/',
-    name: 'Signalement',
-    component: Signalement
+    name: 'Accueil',
+    component: Accueil
+  },
+  {
+    path: '/signaler',
+    name: 'Signaler',
+    component: Signalement,
+    meta: { requiresAuth: true }
   },
   {
     path: '/carte',
@@ -24,7 +30,8 @@ const routes = [
   {
     path: '/nettoyage',
     name: 'Nettoyage',
-    component: Nettoyage
+    component: Nettoyage,
+    meta: { requiresAuth: true }
   },
   {
     path: '/classement',
@@ -40,9 +47,9 @@ const routes = [
   {
     path: '/profil',
     name: 'Profil',
-    component: Profil
+    component: Profil,
+    meta: { requiresAuth: true }
   },
-  // ⚠️ Routes d'authentification - À valider avec l'équipe frontend
   {
     path: '/inscription',
     name: 'Inscription',
@@ -58,6 +65,30 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// Navigation guard global pour la protection des routes et la mémorisation de l'action
+router.beforeEach(async (to, from, next) => {
+  const userStore = useUserStore()
+  
+  // Attendre la vérification de session initiale
+  await userStore.initAuth()
+
+  // 1. Si la route requiert une authentification et l'utilisateur n'est pas connecté
+  if (to.matched.some(record => record.meta.requiresAuth) && !userStore.isAuthenticated) {
+    return next({
+      path: '/connexion',
+      query: { redirect: to.fullPath }
+    })
+  }
+
+  // 2. Si l'utilisateur est déjà connecté et tente d'accéder à Connexion ou Inscription
+  if ((to.path === '/connexion' || to.path === '/inscription') && userStore.isAuthenticated) {
+    const destination = to.query.redirect ? String(to.query.redirect) : '/'
+    return next({ path: destination })
+  }
+
+  next()
 })
 
 export default router
