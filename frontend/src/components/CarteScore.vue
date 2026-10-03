@@ -1,75 +1,67 @@
 <template>
-  <div class="leaderboard-container">
-    <div class="leaderboard-filters">
-      <button 
-        :class="['tab-btn', { active: villeFiltre === '' }]" 
-        @click="changerVille('')"
+  <div>
+    <div class="tabs" role="tablist" aria-label="Filtrer le classement par ville">
+      <button
+        v-for="v in villes"
+        :key="v.id"
+        type="button"
+        role="tab"
+        class="tab"
+        :class="{ 'is-active': villeFiltre === v.id }"
+        :aria-selected="villeFiltre === v.id"
+        @click="changerVille(v.id)"
       >
-        🌍 Tout le Burundi
-      </button>
-      <button 
-        :class="['tab-btn', { active: villeFiltre === 'Bujumbura' }]" 
-        @click="changerVille('Bujumbura')"
-      >
-        Bujumbura
-      </button>
-      <button 
-        :class="['tab-btn', { active: villeFiltre === 'Gitega' }]" 
-        @click="changerVille('Gitega')"
-      >
-        Gitega
+        {{ v.label }}
       </button>
     </div>
 
-    <div v-if="chargement" class="loading-state">
-      Chargement du classement citoyen...
-    </div>
+    <p v-if="chargement" class="loading" role="status">Chargement du classement…</p>
 
-    <div v-else-if="classement.length === 0" class="empty-state">
-      Aucun citoyen classé pour le moment dans cette zone.
-    </div>
+    <EmptyState
+      v-else-if="classement.length === 0"
+      icon="trophy"
+      title="Personne n'est encore classé ici"
+      text="Le classement se remplit dès que des citoyens signalent ou nettoient. Faites la première action."
+      action-label="Signaler un déchet"
+      @action="$router.push('/signaler')"
+    />
 
-    <div v-else class="ranking-list">
-      <div 
-        v-for="(item, index) in classement" 
-        :key="item.id || index" 
-        :class="['rank-item', { 'top-three': index < 3 }]"
-      >
-        <div class="rank-pos">
-          <span v-if="index === 0" class="medal">🥇</span>
-          <span v-else-if="index === 1" class="medal">🥈</span>
-          <span v-else-if="index === 2" class="medal">🥉</span>
-          <span v-else class="rank-num">#{{ index + 1 }}</span>
-        </div>
+    <ul v-else class="rank-list">
+      <li v-for="(item, index) in classement" :key="item.id || index" class="rank">
+        <span class="rank__pos">
+          <span v-if="index < 3" class="rank__medal" aria-hidden="true">{{ MEDAILLES[index] }}</span>
+          <span v-else class="rank__num">{{ index + 1 }}</span>
+        </span>
 
-        <div class="rank-details">
-          <div class="rank-user">
-            <span class="user-name">{{ item.nom }}</span>
-            <span class="user-city">📍 {{ item.ville || 'Burundi' }}</span>
-          </div>
-          
-          <div class="score-breakdown">
-            <span class="badge-pts sig" title="Points gagnés en signalant des problèmes">
-              📸 {{ item.score_signalement || 0 }} pts
-            </span>
-            <span class="badge-pts clean" title="Points bonus gagnés en nettoyant des zones">
-              🧹 {{ item.score_nettoyage || 0 }} pts
-            </span>
-          </div>
-        </div>
+        <span class="rank__body">
+          <span class="rank__name">{{ item.nom }}</span>
+          <span class="rank__city">{{ item.ville || 'Burundi' }}</span>
+          <span class="rank__pts">
+            <span class="tag tag--sig">{{ item.score_signalement || 0 }} signalement</span>
+            <span class="tag tag--clean">{{ item.score_nettoyage || 0 }} nettoyage</span>
+          </span>
+        </span>
 
-        <div class="rank-total">
-          <span class="total-pts">{{ item.score_total }}</span>
-          <small>points</small>
-        </div>
-      </div>
-    </div>
+        <span class="rank__total">
+          <span class="rank__score">{{ item.score_total }}</span>
+          <span class="rank__unit">pts</span>
+        </span>
+      </li>
+    </ul>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { supabase } from '../services/supabaseClient'
+import EmptyState from './EmptyState.vue'
+
+const MEDAILLES = ['🥇', '🥈', '🥉']
+const villes = [
+  { id: '', label: 'Tout le Burundi' },
+  { id: 'Bujumbura', label: 'Bujumbura' },
+  { id: 'Gitega', label: 'Gitega' }
+]
 
 const classement = ref([])
 const chargement = ref(false)
@@ -122,133 +114,144 @@ function chargerDonneesDemo() {
 </script>
 
 <style scoped>
-.leaderboard-container {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 1.25rem;
-}
-
-.leaderboard-filters {
+.tabs {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
+  gap: 8px;
   overflow-x: auto;
+  margin-bottom: 16px;
+  padding-bottom: 2px;
+  scrollbar-width: none;
 }
 
-.tab-btn {
-  padding: 0.45rem 0.85rem;
-  font-size: 0.85rem;
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex: none;
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--fern);
+  font-size: 13.5px;
   font-weight: 600;
-  border: 1px solid #cbd5e1;
-  background: white;
-  border-radius: 6px;
-  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out);
+}
+
+.tab:hover {
+  color: var(--white);
+  border-color: var(--line-2);
+}
+
+.tab.is-active {
+  background: var(--sprout);
+  border-color: var(--sprout);
+  color: var(--onyx);
+}
+
+.loading {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--fern);
+}
+
+.rank-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 11px;
+}
+
+.rank {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 16px;
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.rank__pos {
+  width: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+}
+
+.rank__num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lichen);
+}
+
+.rank__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.rank__name {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.rank__city {
+  font-size: 12.5px;
+  color: var(--fern);
+}
+
+.rank__pts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
   white-space: nowrap;
 }
 
-.tab-btn.active {
-  background: #10B981;
-  color: white;
-  border-color: #10B981;
+.tag--sig {
+  background: rgba(104, 239, 63, 0.12);
+  color: var(--sprout);
 }
 
-.ranking-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
+.tag--clean {
+  background: rgba(242, 193, 78, 0.14);
+  color: var(--amber);
 }
 
-.rank-item {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.75rem;
-  border-radius: 8px;
-  background: #f8fafc;
-  border: 1px solid #f1f5f9;
-}
-
-.rank-item.top-three {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-}
-
-.rank-pos {
-  width: 32px;
-  text-align: center;
-}
-
-.medal {
-  font-size: 1.25rem;
-}
-
-.rank-num {
-  font-weight: 700;
-  color: #64748b;
-  font-size: 0.9rem;
-}
-
-.rank-details {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.rank-user {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.user-name {
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: #0f172a;
-}
-
-.user-city {
-  font-size: 0.75rem;
-  color: #64748b;
-}
-
-.score-breakdown {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.badge-pts {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-
-.badge-pts.sig {
-  background: #EBF4F9;
-  color: #0369a1;
-}
-
-.badge-pts.clean {
-  background: #FDF6EB;
-  color: #b45309;
-}
-
-.rank-total {
+.rank__total {
+  flex: none;
   text-align: right;
+  display: grid;
 }
 
-.total-pts {
-  display: block;
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: #10B981;
+.rank__score {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  color: var(--sprout);
+  line-height: 1.1;
 }
 
-.rank-total small {
-  font-size: 0.7rem;
-  color: #64748b;
-  text-transform: uppercase;
+.rank__unit {
+  font-size: 11px;
+  color: var(--lichen);
 }
 </style>

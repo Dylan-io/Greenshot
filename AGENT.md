@@ -388,8 +388,41 @@ géographique). Les règles suivantes ne sont pas optionnelles.
 
 ---
 
+## 📸 Références visuelles
+
+**Avant de créer ou modifier un écran, consulte [docs/UI-ECRANS.md](docs/UI-ECRANS.md).**
+
+Ce document associe chaque capture d'écran à un **nom de fichier stable** dans
+`frontend/src/assets/images/`, à une route et à une description détaillée de sa
+structure. Il contient aussi les tokens visuels (couleurs, typographie, rayons)
+et la liste des écrans qui n'ont pas encore de capture.
+
+| Besoin | Fichier de référence |
+|---|---|
+| Onboarding (3 pages) | `onboarding-1-…` `onboarding-2-…` `onboarding-3-…` |
+| Choix du compte | `onboarding-4-choix-du-compte.png` |
+| Connexion | `page-connexion.png` |
+| Inscription (identité) | `page-inscription-etape-1-identite-haut.png`, `page-inscription-etape-1-identite-bas.png` |
+| Sélection d'avatar | `page-selection-avatar.png` |
+| Accueil / dashboard (3 scrolls) | `page-accueil-haut.png`, `page-accueil-milieu-liste-nettoyage.png`, `page-accueil-bas-activite-et-defis.png` |
+| Carte du Burundi (desktop) | `page-carte.png` |
+| Carte — états mobiles (ville / pays / 3D) | `page-carte-mobile-vue-ville.png`, `page-carte-mobile-vue-pays.png`, `page-carte-mobile-vue-3d.png` |
+| Signaler un déchet (formulaire) | `page-signaler-un-dechet.png`, `page-signaler-type-et-emplacement.png`, `page-signaler-precision-et-publication.png` |
+| Classement | `page-classement-podium.png`, `page-classement-liste-bas.png` |
+| Profil | `page-profil-haut.png`, `page-profil-badges.png`, `page-profil-historique-et-mon-compte.png` |
+| Bilan d'impact (carte partageable) | `page-bilan-dimpact-haut.png`, `page-bilan-dimpact-partage.png` |
+| Modale de changement d'avatar | `modale-avatar-choix-source.png`, `modale-avatar-compositeur-haut.png`, `modale-avatar-compositeur-bas.png` |
+| Nettoyer un endroit (parcours complet) | `page-nettoyage-liste-zones.png`, `page-nettoyage-etape-1-photo-avant.png`, `page-nettoyage-etape-1-photo-avant-prise.png`, `page-nettoyage-etape-2-menage.png`, `page-nettoyage-etape-3-comparaison.png`, `page-nettoyage-analyse-ia-en-cours.png`, `page-nettoyage-succes-valide.png` |
+
+> Les images de `frontend/src/assets/images/` sont **nommées par rôle**, pas par
+> date de capture. Ne pas les renommer : `docs/UI-ECRANS.md` s'y réfère par nom.
+
+---
+
 ## 📚 Documentation de Référence
 
+- **[Référence des écrans](docs/UI-ECRANS.md)** — Catalogue des captures d'écran, tokens visuels
+- **[Rapport de conformité UI](docs/RAPPORT-UI.md)** — Écarts constatés entre les captures et le front réel
 - **[Vision & Périmètre V1.0](docs/PROJET.md)** — Détail des fonctionnalités et contraintes
 - **[Schéma de la Base de Données](docs/SCHEMA-DB.md)** — Tables, colonnes, types, relations
 - **[Conventions de code](docs/CONVENTIONS.md)** — Standards Git, nommage, bonnes pratiques

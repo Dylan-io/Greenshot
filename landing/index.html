@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!--
+  ► SEULE LIGNE MODIFIABLE PAR L'AGENT : l'attribut data-theme de <html>.
+    Thème sombre → garder data-theme="dark". Thème clair → supprimer l'attribut.
+  Tout le reste de ce fichier est fixe.
+-->
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Template Site Immersif</title>
+  <meta name="description" content="Site généré depuis le template Site Immersif.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!--
+    styles.css n'est PAS lié ici : App.vue l'importe, ce qui laisse Vite
+    l'extraire en un fichier CSS injecté au <head> au build (pas de FOUC).
+  -->
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

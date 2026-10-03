@@ -134,6 +134,42 @@ export const useUserStore = defineStore('user', () => {
     return { error }
   }
 
+  // ── Récupération de mot de passe ─────────────────────────────────────────
+  // Trois appels Supabase, dans cet ordre :
+  //   1. demanderReinitialisation  → envoie l'e-mail avec le code
+  //   2. verifierCodeRecuperation  → échange le code contre une session
+  //   3. changerMotDePasse        → écrit le nouveau mot de passe
+  //
+  // Le `redirectTo` doit être déclaré dans le tableau « Redirect URLs » du
+  // dashboard Supabase, sinon Supabase refuse l'envoi et l'utilisateur ne
+  // reçoit rien.
+
+  async function demanderReinitialisation(email, redirectTo) {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo
+    })
+    return { data, error }
+  }
+
+  // Le type 'recovery' est celui du flux mot de passe oublié. Il ne faut pas
+  // utiliser 'email' ici : ce type-là est réservé à la vérification
+  // d'inscription et Supabase refuserait le code.
+  async function verifierCodeRecuperation(email, token) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'recovery'
+    })
+    return { data, error }
+  }
+
+  // Exige une session ouverte. L'utilisateur est authentifié le temps de
+  // l'écriture, ce qui est normal : c'est la preuve qu'il a bien reçu le code.
+  async function changerMotDePasse(password) {
+    const { data, error } = await supabase.auth.updateUser({ password })
+    return { data, error }
+  }
+
   // Renvoyer l'email de vérification
   async function renvoyerVerification() {
     const { data, error } = await supabase.auth.resendVerificationEmail({
@@ -185,6 +221,9 @@ export const useUserStore = defineStore('user', () => {
     seConnecterUsername,
     deconnecter,
     renvoyerVerification,
+    demanderReinitialisation,
+    verifierCodeRecuperation,
+    changerMotDePasse,
     mettreAJourProfil,
     peutSignaler
   }

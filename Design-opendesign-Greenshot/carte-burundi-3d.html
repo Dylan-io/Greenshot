@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#122314" />
+<title>Greenshot — carte du Burundi en 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Boldonse&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="vendor/maplibre-gl.css" />
+<style>
+:root{
+  --forest:#122314; --forest-2:#0e1c10; --forest-3:#0a1509;
+  --line:rgba(255,255,255,.09); --line-2:#2c4630;
+  --fern:#b7bda5; --lichen:#a7ac9a; --sprout:#68ef3f; --verdant:#26a200; --onyx:#30322a;
+  --danger:#ff7452;
+  --r-pill:999px; --r-sm:14px;
+  --dur-1:170ms; --dur-2:260ms; --ease-out:cubic-bezier(.22,.61,.36,1);
+  --font-display:'Boldonse',system-ui,sans-serif;
+  --font-ui:'Geist','Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--forest-3);color:#fff;
+  font-family:var(--font-ui);-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+:where(button,a,[tabindex]):focus-visible{outline:2px solid var(--sprout);outline-offset:2px;border-radius:10px}
+.ic{width:22px;height:22px;display:block;flex:none}
+.ic.sm{width:18px;height:18px}
+.ic.xs{width:15px;height:15px}
+
+/* ── Scène ───────────────────────────────────────────────────── */
+#scene{position:fixed;inset:0;background:radial-gradient(120% 90% at 50% 12%,#142a18 0%,#0b1a0d 58%,#060d07 100%)}
+#map{position:absolute;inset:0}
+.maplibregl-canvas{outline:none}
+/* voile bas : le bandeau et les boutons restent lisibles sur le binghi */
+#scene::after{content:"";position:absolute;left:0;right:0;bottom:0;height:170px;z-index:2;pointer-events:none;
+  background:linear-gradient(to top,rgba(7,15,8,.92) 0,rgba(7,15,8,.55) 48%,rgba(7,15,8,0) 100%)}
+#scene::before{content:"";position:absolute;left:0;right:0;top:0;height:180px;z-index:2;pointer-events:none;
+  background:linear-gradient(to bottom,rgba(7,15,8,.94) 0,rgba(7,15,8,.5) 55%,rgba(7,15,8,0) 100%)}
+
+/* ── Mode intégré : la carte vit dans un iframe de l'application ──
+   La navigation appartient à l'app parente, donc le bouton retour et le
+   bandeau de titre local s'effacent : le chrome de l'écran Carte suffit. */
+body.is-embedded{--embed-top:0px}
+body.is-embedded .backbtn{display:none}
+body.is-embedded .sbar{padding-top:calc(18px + env(safe-area-inset-top))}
+body.is-embedded .sbar .sub{display:none}
+body.is-embedded .wherebar{top:calc(66px + env(safe-area-inset-top))}
+body.is-embedded .radar{top:calc(66px + env(safe-area-inset-top))}
+
+/* ── Repli hors-ligne (contour du Burundi, sans WebGL ni réseau) ── */
+#fallback{position:absolute;inset:0;z-index:1;display:none}
+#fallback.on{display:block}
+#fallback svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);width:min(74%,320px);height:auto}
+#fallback path{fill:rgba(38,162,0,.22);stroke:rgba(104,239,63,.55);stroke-width:1.6;stroke-linejoin:round}
+.fb-pin{position:absolute;width:26px;height:26px;margin:-22px 0 0 -13px;border-radius:50%;display:grid;place-items:center;
+  background:var(--fc,#68ef3f);color:#08130a;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28),0 6px 10px rgba(0,0,0,.5)}
+.fb-red{color:#1a0905;box-shadow:inset 0 0 0 1px rgba(255,180,160,.4),0 6px 12px rgba(120,30,10,.45)}
+.fb-pin svg{width:14px;height:14px;position:static;transform:none}
+.fb-note{position:absolute;left:50%;top:calc(160px + env(safe-area-inset-top));transform:translateX(-50%);
+  width:max-content;max-width:calc(100% - 32px);padding:10px 14px;border-radius:var(--r-sm);
+  background:rgba(10,21,9,.94);border:1px solid var(--line-2);font-size:12.5px;color:var(--fern);text-align:center}
+
+/* ── Chargement ──────────────────────────────────────────────── */
+/* ── Chrome mobile ───────────────────────────────────────────── */
+.sbar{position:absolute;left:0;right:0;top:0;z-index:6;display:flex;align-items:flex-start;gap:12px;
+  padding:calc(30px + env(safe-area-inset-top)) 18px 16px;pointer-events:none}
+.sbar > *{pointer-events:auto}
+.sbar-title{flex:1 1 auto;min-width:0}
+.sbar h1{margin:0;font-family:var(--font-display);font-weight:400;font-size:19px;line-height:1.25}
+.sbar .sub{margin-top:5px;font-size:12.5px;line-height:1.45;color:var(--fern)}
+.backbtn{width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center;
+  background:rgba(12,26,14,.9);border:1px solid var(--line-2);color:var(--white)}
+.backbtn:hover{border-color:var(--sprout);color:var(--sprout)}
+
+/* barre de position */
+.wherebar{position:absolute;left:16px;right:16px;top:calc(104px + env(safe-area-inset-top));z-index:5;
+  display:flex;align-items:center;gap:9px;height:46px;padding:0 13px;border-radius:var(--r-pill);
+  background:rgba(12,26,14,.9);border:1px solid var(--line-2);backdrop-filter:blur(10px);
+  font-size:13px;width:calc(100% - 32px)}
+.wherebar:hover{border-color:var(--sprout)}
+.wherebar .ic{color:var(--sprout);flex:none}
+.wherebar b{font-weight:600}
+.wherebar .sep{color:var(--fern);opacity:.6}
+.wherebar .live{margin-left:auto;flex:none;display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;
+  letter-spacing:.1em;color:var(--sprout);text-transform:uppercase}
+.wherebar .live i{width:7px;height:7px;border-radius:50%;background:var(--sprout);animation:livePulse 2s var(--ease-out) infinite}
+@keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(104,239,63,.5)}70%,100%{box-shadow:0 0 0 7px rgba(104,239,63,0)}}
+
+/* rail de filtres */
+.rail{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:5;display:grid;gap:7px}
+.fr{position:relative;width:44px;height:44px;border-radius:13px;display:grid;place-items:center;
+  background:rgba(12,26,14,.9);border:1px solid var(--line);color:var(--fern);
+  transition:background var(--dur-1) var(--ease-out),border-color var(--dur-1) var(--ease-out),color var(--dur-1) var(--ease-out)}
+.fr .shp{width:22px;height:22px;display:grid;place-items:center;color:#08130a;background:var(--fc,var(--sprout));
+  opacity:.34;transition:opacity var(--dur-1) var(--ease-out)}
+.fr:hover{border-color:var(--line-2)}
+.fr:hover .shp{opacity:.72}
+.fr[aria-pressed="true"]{background:var(--fc,var(--sprout));border-color:transparent;transform:scale(1.05)}
+.fr[aria-pressed="true"] .shp{opacity:1}
+.fr .cnt{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;
+  display:grid;place-items:center;font-size:9.5px;font-weight:700;background:var(--forest-2);border:1px solid var(--line-2);color:var(--fern)}
+.fr[aria-pressed="true"] .cnt{background:#08130a;border-color:transparent;color:var(--fc)}
+.shp.teardrop{clip-path:polygon(50% 0,78% 22%,96% 52%,78% 88%,50% 100%,22% 88%,4% 52%,22% 22%)}
+.shp.diamond{clip-path:polygon(50% 2%,98% 50%,50% 98%,2% 50%)}
+.shp.circle{border-radius:50%}
+.shp.triangle{clip-path:polygon(50% 6%,96% 94%,4% 94%)}
+.shp.square{border-radius:28%}
+.shp.hex{clip-path:polygon(25% 3%,75% 3%,99% 50%,75% 97%,25% 97%,1% 50%)}
+
+/* colonne d'outils */
+.tools{position:absolute;right:14px;bottom:96px;z-index:5;display:grid;gap:9px;justify-items:end}
+.cluster{display:grid;background:rgba(12,26,14,.92);border:1px solid var(--line);border-radius:26px;overflow:hidden;
+  box-shadow:0 10px 24px rgba(0,0,0,.45)}
+.cluster .fab{width:46px;height:46px;display:grid;place-items:center;color:var(--white);transition:background var(--dur-1) var(--ease-out)}
+.cluster .fab + .fab{border-top:1px solid var(--line)}
+.cluster .fab:hover:not(:disabled){background:rgba(104,239,63,.16);color:var(--sprout)}
+.cluster .fab:disabled{opacity:.4;cursor:default}
+.cluster .fab:disabled:hover{color:var(--white);background:none}
+.fab{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(12,26,14,.92);
+  border:1px solid var(--line);color:var(--white);box-shadow:0 10px 24px rgba(0,0,0,.45);
+  transition:background var(--dur-1) var(--ease-out),color var(--dur-1) var(--ease-out),border-color var(--dur-1) var(--ease-out)}
+.fab:hover{border-color:var(--sprout);color:var(--sprout)}
+.fab.on{background:rgba(104,239,63,.2);border-color:var(--sprout);color:var(--sprout)}
+.fab.busy .ic{animation:spin 1.1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.cta{display:flex;align-items:center;gap:8px;height:52px;padding:0 18px;border-radius:var(--r-sm);
+  background:var(--sprout);color:var(--onyx);font-weight:600;font-size:14.5px;box-shadow:0 10px 24px rgba(0,0,0,.4);
+  transition:background var(--dur-1) var(--ease-out)}
+.cta:hover{background:#7cf556}
+
+/* légende */
+.legend{position:absolute;left:74px;bottom:96px;z-index:5;max-width:210px;border-radius:var(--r-sm);
+  background:rgba(10,21,9,.92);border:1px solid var(--line);backdrop-filter:blur(10px);overflow:hidden}
+.legend button{display:flex;align-items:center;gap:9px;width:100%;height:44px;padding:0 12px;font-size:12.5px;font-weight:600;color:var(--white)}
+.legend button:hover{background:rgba(30,53,32,.9)}
+.legend .caret{margin-left:auto;color:var(--fern);transition:transform var(--dur-2) var(--ease-out)}
+.legend.open .caret{transform:rotate(90deg)}
+.legend-body{display:none;padding:4px 12px 12px;font-size:12px;color:var(--fern)}
+.legend.open .legend-body{display:grid;gap:7px}
+.legend-row{display:flex;align-items:center;gap:8px}
+.legend-row .n{margin-left:auto;color:var(--white);font-weight:600}
+
+/* bandeau bas */
+.ticker{position:absolute;left:0;right:0;bottom:0;z-index:6;display:flex;align-items:center;gap:10px;
+  padding:12px 16px calc(14px + env(safe-area-inset-bottom));background:rgba(7,15,8,.94);
+  border-top:1px solid var(--line);font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--fern)}
+.ticker b{font-family:var(--font-display);font-weight:400;letter-spacing:0;font-size:16px;color:var(--sprout);text-transform:none}
+.tk-btn{margin-left:auto;flex:none;height:36px;padding:0 13px;border-radius:99px;font-size:11px;font-weight:700;
+  letter-spacing:.09em;background:rgba(104,239,63,.18);color:var(--sprout);display:flex;align-items:center;gap:6px;
+  transition:background var(--dur-1) var(--ease-out)}
+.tk-btn:hover{background:rgba(104,239,63,.3)}
+
+/* source des données */
+.credit{position:absolute;right:8px;bottom:calc(58px + env(safe-area-inset-bottom));z-index:4;
+  font-size:9.5px;color:var(--fern);opacity:.62;pointer-events:none;text-align:right}
+
+/* infobulle de pin */
+#tip{position:absolute;z-index:7;max-width:224px;padding:10px 12px;border-radius:12px;
+  background:rgba(8,20,11,.96);border:1px solid var(--line-2);box-shadow:0 14px 30px rgba(0,0,0,.55);
+  font-size:12.5px;line-height:1.45;pointer-events:none;opacity:0;transform:translate(-50%,-100%) translateY(-10px);
+    transition:opacity var(--dur-1) var(--ease-out)}
+  /* Le conteneur reste transparent au pointeur, mais le bouton doit répondre :
+     sans ce relèvement, « Nettoyer ce lieu » serait inatteignable. */
+  #tip .go{pointer-events:auto;cursor:pointer}
+#tip.on{opacity:1}
+#tip b{display:block;font-size:13.5px;margin-bottom:3px}
+#tip span{color:var(--fern)}
+#tip .go{display:inline-flex;align-items:center;gap:6px;margin-top:9px;padding:7px 11px;border-radius:99px;
+  background:var(--sprout);color:var(--onyx);font-size:12px;font-weight:700}
+/* Un signalement rouge : la bordure et l'action passent au rouge, pour que
+   le danger se lise avant même d'avoir lu le texte. */
+#tip.is-red{border-color:rgba(255,116,82,.45);background:rgba(28,14,10,.97)}
+#tip.is-red b.td{color:var(--danger)}
+#tip .tl{color:var(--danger);font-weight:600}
+#tip .go.alt{background:var(--danger);color:#1a0905}
+.fr-red{border-color:rgba(255,116,82,.45)}
+.fr-red[aria-pressed="true"]{box-shadow:0 0 0 2px rgba(255,116,82,.3)}
+
+@media (min-width:900px){
+  .sbar{padding:26px 28px 16px}
+  .sbar h1{font-size:22px}
+  .wherebar{left:auto;right:28px;width:340px;top:26px}
+  .rail{left:20px}
+  .tools{right:24px;bottom:110px}
+  .legend{left:86px;bottom:110px}
+}
+@media (prefers-reduced-motion:reduce){
+  .wherebar .live i{animation:none}
+}
+</style>
+</head>
+<body>
+<div id="scene" data-od-id="carte-3d-scene">
+  <div id="map" role="application" aria-label="Carte interactive du Burundi"></div>
+
+  <!-- Repli : contour du Burundi dessiné en SVG, sans WebGL ni réseau -->
+  <div id="fallback" data-od-id="carte-repli-hors-ligne">
+    <svg viewBox="-18 -18 236 274.46" role="img" aria-label="Contour du Burundi">
+      <path d="M171.3 9.7L169.1 12.6L158.9 33.4L156.9 36.6L158 38.5L162.4 42.4L159.8 49L158.8 50.7L156.9 56.9L157.9 62.5L160.4 64.6L167 67.3L177 69.2L188.7 73.9L196.5 74.8L198.4 78.1L198 84.2L200 89.4L200 98.8L197.6 107L185.6 110.9L179.4 115.1L177.7 117.2L179.2 119.7L180 123L168.7 131.3L157 142L154.2 149.2L151.9 157.8L148.5 163.2L139.6 171.1L130.5 186.9L126.1 197.2L103.8 221.9L84.1 234.3L78.3 238.5L43.3 237.7L40.6 221.1L35.3 198.3L23.3 177.8L22 169.2L22.5 152.7L22.6 129.4L21.8 116.9L22 107.7L23.6 91.9L23.4 82.4L15.5 71.5L5.6 59.8L0.3 54.2L0 49.6L0 45.3L1.6 39.1L5.5 32.2L9.8 31.5L20.4 34.2L31.5 40.1L37.4 53.2L41.8 55.2L50 55.1L70.9 53.4L76.1 53.6L85.6 50.5L95 44.9L97.8 39.1L100 26.2L101.9 3L106.7 2.7L119.9 11L122.8 11.5L125.5 11.2L130.1 7.1L135.7 3.8L139.9 3.9L155.2 0L163.4 7L168.6 9.2L171.3 9.7Z"></path>
+    </svg>
+    <div id="fbPins"></div>
+    <p class="fb-note" id="fbNote">Carte vectorielle indisponible sur cet appareil — vue du Burundi hors ligne, signalements de démonstration.</p>
+  </div>
+
+  <header class="sbar">
+    <button class="backbtn" id="back" aria-label="Revenir à l'application" data-od-id="carte-retour">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+    <div class="sbar-title">
+      <h1>Carte du Burundi</h1>
+      <p class="sub">Vues satellite et de rue, filtres par type de déchet, votre position en direct.</p>
+    </div>
+  </header>
+
+  <button class="wherebar" id="where" data-od-id="carte-position">
+    <svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    <b id="whereName">Bujumbura</b><span class="sep">·</span><span id="whereSub">position de démo</span>
+    <span class="live"><i aria-hidden="true"></i>3D</span>
+  </button>
+
+  <div class="rail" id="rail" role="group" aria-label="Filtrer par type de déchet" data-od-id="carte-filtres"></div>
+
+  <div class="legend" id="legend" data-od-id="carte-legende">
+    <button id="legendToggle" aria-expanded="false">
+      <svg class="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      Légende
+      <svg class="ic sm caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <div class="legend-body" id="legendBody"></div>
+  </div>
+
+  <div class="tools" data-od-id="carte-outils">
+    <div class="cluster" role="group" aria-label="Zoom et vue">
+      <button class="fab" id="zoomIn" aria-label="Zoomer" data-od-id="carte-zoom-plus"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="fab" id="zoomOut" aria-label="Dézoomer" data-od-id="carte-zoom-moins"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+      <button class="fab" id="tilt" aria-label="Basculer la vue 3D" aria-pressed="false" data-od-id="carte-bascule-3d"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/></svg></button>
+      <button class="fab" id="geo" aria-label="Centrer sur ma position GPS" data-od-id="carte-geolocalisation"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.4"/><circle cx="12" cy="12" r="8.2"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>
+    </div>
+    <a class="cta" href="index.html#/signaler" target="_top" data-od-id="carte-cta">Signaler ici</a>
+  </div>
+
+  <p class="credit">Fond de carte © contributeurs OpenStreetMap · tuiles OpenFreeMap</p>
+
+  <div class="ticker">
+    <span><b id="openCount">12</b> signalements à traiter</span>
+    <button class="tk-btn" id="share" type="button">
+      <svg class="ic xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-3-6-7-2z"/></svg>
+      Partager
+    </button>
+  </div>
+
+  <div id="tip" role="status" aria-live="polite"></div>
+</div>
+
+<script src="vendor/maplibre-gl.js" defer></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   Greenshot · carte 3D du Burundi
+   Moteur : MapLibre GL JS (local, vendor/) · projection globe + mercator
+   Tuiles : OpenFreeMap / OpenStreetMap — aucune clé API requise
+   ═══════════════════════════════════════════════════════════════ */
+
+const BDI = { lon:29.9246, lat:-3.4271, zoom:6.4 };          // centre géographique du Burundi
+const HOME = { lon:29.3644, lat:-3.3822 };                  // Bujumbura, point de départ
+const ZOOM_MIN = 3, ZOOM_MAX = 17;
+
+const ICONS = {
+  bag:'<path d="M6 9h12l-1 11H7L6 9z"/><path d="M9 9V7a3 3 0 0 1 6 0v2"/>',
+  bottle:'<path d="M10 3h4v3l1.5 2.5V20a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V8.5L10 6V3z"/><path d="M9 12h6"/>',
+  glass:'<path d="M8 3h8l-1 5a3 3 0 0 1-3 2.5A3 3 0 0 1 9 8L8 3z"/><path d="M12 10.5V20M8.5 20h7"/>',
+  cig:'<path d="M3 16h13v3H3z"/><path d="M17.5 16H20v3h-2.5z"/><path d="M17 7c1.5 1 1.5 3 0 4M20 6c2 1.4 2 4.6 0 6"/>',
+  sofa:'<path d="M5 12V9a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="M3 12h18v5H3z"/><path d="M6 17v2M18 17v2"/>',
+  box:'<path d="M3.5 8 12 4l8.5 4-8.5 4-8.5-4z"/><path d="M3.5 8v8L12 20l8.5-4V8"/><path d="M12 12v8"/>'
+};
+const ic = (n, cls) => '<svg class="ic ' + (cls || '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[n] + '</svg>';
+
+const TYPES = {
+  menagers:{ label:'Déchets ménagers', short:'Ménagers', icon:'bag', color:'#68ef3f', shape:'teardrop' },
+  plastique:{ label:'Plastique', short:'Plastique', icon:'bottle', color:'#4fd6e0', shape:'diamond' },
+  verre:{ label:'Verre', short:'Verre', icon:'glass', color:'#7f9cf5', shape:'circle' },
+  megots:{ label:'Mégots', short:'Mégots', icon:'cig', color:'#f2c14e', shape:'triangle' },
+  encombrants:{ label:'Encombrants', short:'Encombrants', icon:'sofa', color:'#e08a5b', shape:'square' },
+  papiers:{ label:'Papiers & cartons', short:'Papiers', icon:'box', color:'#c48fe0', shape:'hex' }
+};
+
+const REPORTS = [
+  { id:'r1', type:'menagers', address:'Marché du Centre', area:'Rohero · Bujumbura', lon:29.3626, lat:-3.3826, when:'il y a 18 min' },
+  { id:'r2', type:'plastique', address:'Quai de la Ruvubu', area:'Rohero · Bujumbura', lon:29.3581, lat:-3.3898, when:'il y a 1 h' },
+  { id:'r3', type:'megots', address:'Carrefour Sipromoke', area:'Mukike · Bujumbura', lon:29.3611, lat:-3.3965, when:'il y a 2 h' },
+  { id:'r4', type:'encombrants', address:'Avenue de l’Indépendance', area:'NgaramBI · Bujumbura', lon:29.3662, lat:-3.3642, when:'il y a 3 h' },
+  { id:'r5', type:'verre', address:'Parc de l’Indépendance', area:'Gihanga · Bujumbura', lon:29.3455, lat:-3.3856, when:'hier' },
+  { id:'r6', type:'papiers', address:'Avenue de la Révolution', area:'Rohero · Bujumbura', lon:29.3691, lat:-3.3752, when:'il y a 4 h' },
+  { id:'r7', type:'menagers', address:'Gare de Bujumbura', area:'Rohero · Bujumbura', lon:29.3649, lat:-3.3783, when:'hier' },
+  { id:'r8', type:'plastique', address:'Route de Gatumba', area:'Kanyosha · Bujumbura', lon:29.3122, lat:-3.4415, when:'il y a 5 h' },
+  { id:'r9', type:'megots', address:'Marché de Cibitoke', area:'Cibitoke · Bujumbura', lon:29.3638, lat:-3.4049, when:'il y a 6 h' },
+  { id:'r10', type:'papiers', address:'Gitega, avenue du Mosque', area:'Gitega', lon:29.9268, lat:-3.4252, when:'il y a 1 h' },
+  { id:'r11', type:'menagers', address:'Ngozi, marché central', area:'Ngozi', lon:29.9281, lat:-3.7361, when:'il y a 3 h' },
+  { id:'r12', type:'verre', address:'Muyinga, colline Zaza', area:'Muyinga', lon:30.0402, lat:-2.8471, when:'il y a 2 h' },
+    /* Signalements rouges : ils engagent la securite et demandent l intervention
+       d une organisation competente. Un particulier ne peut pas les nettoyer, donc
+       ils sont colores differemment, filtres a part, et l infobulle ne propose
+       jamais « Nettoyer ce lieu ». */
+    { id:'r13', type:'encombrants', sev:'red', org:'Office burundais de l’environnement', address:'Zone industrielle de Gitega', area:'Gitega', lon:29.9236, lat:-3.4281, when:'il y a 40 min' },
+    { id:'r14', type:'encombrants', sev:'red', org:'REGIDESO', address:'Avenue de l’Indépendance, pylône 4', area:'NgaramBI · Bujumbura', lon:29.3678, lat:-3.3618, when:'il y a 1 h' },
+    { id:'r15', type:'menagers', sev:'red', org:'Société burundaise d’assainissement', address:'Bukavu, collecteur principal', area:'Bukavu · Bujumbura', lon:29.3728, lat:-3.4061, when:'il y a 3 h' },
+    { id:'r16', type:'encombrants', sev:'red', org:'Police nationale', address:'Carrefour Sipromoke', area:'Mukike · Bujumbura', lon:29.3625, lat:-3.3951, when:'il y a 2 h' }
+  ];
+  const isRed = r => !!r.sev;
+  const DANGER = '#ff7452';
+
+let map = null, filter = 'all', filterPending = null, user = { ...HOME, acc:null, live:false }, tipTimer = null;
+
+/* ── Style : palette Forest + Electric Sprout, sur tuiles vectorielles ── */
+function gsStyle(){
+  const src = { type:'vector', url:'https://tiles.openfreemap.org/planet' };
+  return {
+    version: 8,
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    sprite: 'https://tiles.openfreemap.org/sprites/ofm_f384/ofm',
+    /* Les sources de données Greenshot sont déclarées ici (et non ajoutées après
+       `load`) : une couche qui référence une source absente fait échouer tout le style. */
+    sources: { om: src, pins:{ type:'geojson', data:fc() },
+               you:{ type:'geojson', data:{ type:'FeatureCollection', features:[
+                 { type:'Feature', properties:{}, geometry:{ type:'Point', coordinates:[HOME.lon, HOME.lat] } }] } } },
+    layers: [
+      { id:'bg', type:'background', paint:{ 'background-color':'#0d1c10' } },
+      { id:'landcover', type:'fill', source:'om', 'source-layer':'landcover',
+        paint:{ 'fill-color':'#12271a', 'fill-opacity':['interpolate',['linear'],['zoom'],4,0,10,0.9] } },
+      { id:'park', type:'fill', source:'om', 'source-layer':'park',
+        paint:{ 'fill-color':'#16301d', 'fill-opacity':['interpolate',['linear'],['zoom'],6,0,12,0.85] } },
+      { id:'water', type:'fill', source:'om', 'source-layer':'water',
+        paint:{ 'fill-color':'#0a2230', 'fill-outline-color':'#123a4d' } },
+      { id:'river', type:'line', source:'om', 'source-layer':'waterway',
+        layout:{ 'line-cap':'round' },
+        paint:{ 'line-color':'#16465c', 'line-width':['interpolate',['linear'],['zoom'],7,0.4,14,2.4] } },
+      { id:'bld-casing', type:'line', source:'om', 'source-layer':'building', minzoom:13,
+        paint:{ 'line-color':'#0a1509', 'line-width':1, 'line-opacity':0.5 } },
+      { id:'bld-3d', type:'fill-extrusion', source:'om', 'source-layer':'building', minzoom:14,
+        paint:{ 'fill-extrusion-color':'#223d27', 'fill-extrusion-height':['coalesce',['get','render_height'],['get','height'],8],
+                'fill-extrusion-base':['coalesce',['get','render_min_height'],['get','min_height'],0],
+                'fill-extrusion-opacity':0.92 } },
+      { id:'road-minor-c', type:'line', source:'om', 'source-layer':'transportation', minzoom:12,
+        filter:['match',['get','class'],['minor','service','track'],true,false],
+        paint:{ 'line-color':'#0a1509','line-width':['interpolate',['exponential',1.3],['zoom'],12,0.6,18,14] } },
+      { id:'road-minor', type:'line', source:'om', 'source-layer':'transportation', minzoom:11,
+        filter:['match',['get','class'],['minor','service','track'],true,false],
+        paint:{ 'line-color':'#2f4634','line-width':['interpolate',['exponential',1.3],['zoom'],11,0.3,18,11] } },
+      { id:'road-major-c', type:'line', source:'om', 'source-layer':'transportation', minzoom:9,
+        filter:['match',['get','class'],['motorway','trunk','primary','secondary'],true,false],
+        paint:{ 'line-color':'#0a1509','line-width':['interpolate',['exponential',1.3],['zoom'],9,0.8,18,18] } },
+      { id:'road-major', type:'line', source:'om', 'source-layer':'transportation', minzoom:8,
+        filter:['match',['get','class'],['motorway','trunk','primary','secondary'],true,false],
+        paint:{ 'line-color':'#3d5a43','line-width':['interpolate',['exponential',1.3],['zoom'],8,0.4,18,14] } },
+      { id:'bnd-country', type:'line', source:'om', 'source-layer':'boundary',
+        filter:['all',['<=',['get','admin_level'],2],['!=',['get','maritime'],true]],
+        paint:{ 'line-color':'rgba(104,239,63,.5)','line-width':['interpolate',['linear'],['zoom'],4,0.8,10,2.2] } },
+      { id:'bnd-state', type:'line', source:'om', 'source-layer':'boundary',
+        filter:['all',['==',['get','admin_level'],4]],
+        paint:{ 'line-color':'rgba(183,189,165,.22)','line-dasharray':[2,2],'line-width':1 } },
+
+      /* ── Données Greenshot ── */
+      { id:'pts-halo', type:'circle', source:'pins',
+        paint:{ 'circle-radius':['interpolate',['linear'],['zoom'],8,7,14,11,18,15],
+                'circle-color':'rgba(7,15,8,.85)','circle-blur':0.15 } },
+      { id:'pts', type:'circle', source:'pins',
+              paint:{ 'circle-radius':['interpolate',['linear'],['zoom'],8,4.5,14,8,18,11],
+                      /* Le rouge gagne sur le type : un pin rouge signifie « pas pour
+                         toi », pas « encombrants ». C est la seule information qui
+                         change la decision de l utilisateur. */
+                      'circle-color':['case',['==',['get','sev'],1],DANGER,
+                        ['match',['get','type'],'menagers','#68ef3f','plastique','#4fd6e0','verre','#7f9cf5','megots','#f2c14e','encombrants','#e08a5b','papiers','#c48fe0','#68ef3f']],
+                      'circle-stroke-color':'rgba(255,255,255,.5)','circle-stroke-width':['interpolate',['linear'],['zoom'],12,0,14,1] } },
+      { id:'you-halo', type:'circle', source:'you',
+        paint:{ 'circle-radius':['interpolate',['linear'],['zoom'],10,9,16,16],'circle-color':'rgba(104,239,63,.22)','circle-blur':0.5 } },
+      { id:'you-dot', type:'circle', source:'you',
+        paint:{ 'circle-radius':['interpolate',['linear'],['zoom'],10,3.5,16,6],'circle-color':'#68ef3f',
+                'circle-stroke-color':'#0d1c10','circle-stroke-width':2 } },
+
+      /* ── Étiquettes ── */
+      { id:'lbl-road', type:'symbol', source:'om', 'source-layer':'transportation_name', minzoom:14,
+        layout:{ 'symbol-placement':'line','text-field':['get','name'],'text-size':10.5,
+                 'text-font':['Noto Sans Regular'],'text-letter-spacing':0.04 },
+        paint:{ 'text-color':'#8d9c86','text-halo-color':'#08130a','text-halo-width':1.4 } },
+      { id:'lbl-city', type:'symbol', source:'om', 'source-layer':'place', minzoom:6,
+        filter:['match',['get','class'],['city','town','village'],true,false],
+        layout:{ 'text-field':['coalesce',['get','name:latin'],['get','name']],'text-size':['interpolate',['linear'],['zoom'],6,10,12,13],
+                 'text-font':['Noto Sans Bold'],'text-transform':'uppercase','text-letter-spacing':0.09,'text-max-width':9 },
+        paint:{ 'text-color':'#e7f0dd','text-halo-color':'#08130a','text-halo-width':1.8 } },
+      { id:'lbl-country', type:'symbol', source:'om', 'source-layer':'place',
+        filter:['all',['==',['get','class'],'country'],['<=',['get','rank'],3]],
+        layout:{ 'text-field':['coalesce',['get','name:latin'],['get','name']],'text-size':13,'text-font':['Noto Sans Regular'],'text-letter-spacing':0.16 },
+        paint:{ 'text-color':'rgba(183,189,165,.72)','text-halo-color':'#08130a','text-halo-width':1.6 } }
+    ]
+  };
+}
+
+const fc = () => ({
+  type:'FeatureCollection',
+  features: REPORTS.map(r => ({ type:'Feature', id:r.id,
+    properties:{ id:r.id, type:r.type, sev: r.sev ? 1 : 0, label:TYPES[r.type].label },
+    geometry:{ type:'Point', coordinates:[r.lon, r.lat] } }))
+});
+
+/* ── Repli hors-ligne : même donnée, en DOM ──
+   Le contour vient de Natural Earth 50 m reprojeté dans un repère 200 × 238.46.
+   On réutilise exactement cette projection, puis la matrice de transformation du
+   SVG pour passer en pixels écran — ainsi les pastilles tombent sur la coordonnée
+   réelle quelle que soit la taille affichée du pays. */
+const FB_BOX = { lon0:29.01416, lon1:30.811426, lat0:-4.455859, lat1:-2.312988 };
+function renderFallback(){
+  const svg = document.querySelector('#fallback svg');
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return;
+  /* Points réels : on écarte ceux qui tombent à moins de 26 px les uns des autres
+     (Bujumbura en compte neuf), en spirale déterministe et bornée au cadre du pays,
+     pour que rien ne se superpose ni ne sorte du contour. */
+  const pts = REPORTS.map(r => {
+    const p = svg.createSVGPoint();
+    /* +18 : le viewBox est « -18 -18 236 274.46 », le pays occupe donc un repère
+       200 × 238.46 encadré de 18 unités de marge. Sans ce décalage, toutes les
+       pastilles tombaient 18 unités au nord-ouest de leur position réelle. */
+    p.x = (r.lon - FB_BOX.lon0) / (FB_BOX.lon1 - FB_BOX.lon0) * 200 + 18;
+    p.y = (FB_BOX.lat1 - r.lat) / (FB_BOX.lat1 - FB_BOX.lat0) * 238.46 + 18;
+    const s = p.matrixTransform(ctm);
+    return { r, x:s.x, y:s.y };
+  });
+  const box = svg.getBoundingClientRect();
+  const MIN = 27, taken = [];
+  const fits = (x, y) => x >= box.left + 14 && x <= box.right - 14 && y >= box.top + 14 && y <= box.bottom - 14;
+  const host = document.getElementById('fbPins');
+  host.innerHTML = pts.map(o => {
+    let x = o.x, y = o.y;
+    if (!fits(x, y) || taken.some(t => Math.hypot(t.x - x, t.y - y) < MIN)) {
+      for (let g = 1; g <= 40; g++) {
+        const a = g * 2.399963, rad = MIN * 0.62 * Math.sqrt(g);
+        const cx = o.x + Math.cos(a) * rad, cy = o.y + Math.sin(a) * rad;
+        if (fits(cx, cy) && !taken.some(t => Math.hypot(t.x - cx, t.y - cy) < MIN)) { x = cx; y = cy; break; }
+      }
+    }
+    taken.push({ x, y });
+        /* Le repli respecte la meme regle de couleur : un signalement rouge reste
+           rouge, sinon la carte dirait le contraire de l application. */
+        const col = isRed(o.r) ? DANGER : TYPES[o.r.type].color;
+        return '<span class="fb-pin' + (isRed(o.r) ? ' fb-red' : '') + '" style="left:' + x.toFixed(0) + 'px;top:' + y.toFixed(0) +
+               'px;--fc:' + col + '">' + ic(isRed(o.r) ? 'shield' : TYPES[o.r.type].icon, 'xs') + '</span>';
+  }).join('');
+}
+
+function useFallback(msg){
+  document.getElementById('map').style.display = 'none';
+  document.getElementById('fallback').classList.add('on');
+  const n = document.getElementById('fbNote');
+  if (n) n.textContent = msg;
+  renderFallback();
+}
+
+/* ── Chrome : filtres, légende, compteurs ── */
+function counts(){
+  const c = { all:REPORTS.filter(r => !isRed(r)).length, red:REPORTS.filter(isRed).length };
+  REPORTS.filter(r => !isRed(r)).forEach(r => { c[r.type] = (c[r.type] || 0) + 1; });
+  return c;
+}
+function renderChrome(){
+  const c = counts();
+  const rail = document.getElementById('rail');
+  rail.innerHTML =
+    '<button class="fr" data-filter="all" aria-pressed="true" aria-label="Tous les types, ' + c.all + ' signalements à nettoyer" style="--fc:#68ef3f">' +
+      '<span class="shp circle">' + ic('bag','xs') + '</span><span class="cnt">' + c.all + '</span></button>' +
+    Object.keys(TYPES).map(k => '<button class="fr" data-filter="' + k + '" aria-pressed="false" aria-label="' +
+      TYPES[k].label + ', ' + (c[k] || 0) + ' signalements" style="--fc:' + TYPES[k].color + '">' +
+      '<span class="shp ' + TYPES[k].shape + '">' + ic(TYPES[k].icon, 'xs') + '</span><span class="cnt">' + (c[k] || 0) + '</span></button>').join('') +
+    /* Les rouges ont leur propre filtre : on ne les melange jamais a une
+       categorie de nettoyage, sinon le compte serait faux. */
+    (c.red ? '<button class="fr fr-red" data-filter="red" aria-pressed="false" aria-label="Organisation compétente requise, ' + c.red + ' signalements" style="--fc:' + DANGER + '">' +
+      '<span class="shp circle">' + ic('shield','xs') + '</span><span class="cnt">' + c.red + '</span></button>' : '');
+
+  document.getElementById('legendBody').innerHTML =
+    Object.keys(TYPES).map(k =>
+      '<span class="legend-row"><span class="shp ' + TYPES[k].shape + '" style="background:' + TYPES[k].color + ';width:14px;height:14px"></span>' +
+      TYPES[k].short + '<span class="n">' + (c[k] || 0) + '</span></span>').join('') +
+    (c.red ? '<span class="legend-row"><span class="shp circle" style="background:' + DANGER + ';width:14px;height:14px"></span>' +
+      'Organisation requise<span class="n">' + c.red + '</span></span>' : '');
+
+  document.getElementById('openCount').textContent = c.all;
+  rail.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
+    rail.querySelectorAll('[data-filter]').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+    filter = b.getAttribute('data-filter');
+    applyFilter();
+  }));
+}
+function applyFilter(){
+  if (!map) return;
+  /* « red » est une severite, pas une categorie : le filtre doit le dire. */
+  filterPending = filter === 'all'   ? ['!=', ['get','sev'], 1]
+          : filter === 'red'   ? ['==', ['get','sev'], 1]
+          : ['all', ['==', ['get','type'], filter], ['!=', ['get','sev'], 1]];
+  /* Un clic sur le rail peut preceder la fin du chargement du style : MapLibre
+     leve alors « Style is not done loading ». On retient le filtre et on
+     l'applique des que la carte est prete, plutot que perdre le clic. */
+  if (!map.isStyleLoaded()) return;
+  ['pts','pts-halo'].forEach(id => map.setFilter(id, filterPending));
+}
+
+/* ── Infobulle ── */
+function showTip(f, x, y){
+  const r = REPORTS.find(r => r.id === f.properties.id);
+  if (!r) return;
+  const t = TYPES[r.type];
+  const tip = document.getElementById('tip');
+  /* Un signalement rouge n'offre pas « Nettoyer ce lieu » : il nomme
+     l organisation competente. C'est la seule action reelle qui existe. */
+  tip.innerHTML = isRed(r)
+    ? '<b class="td">Organisation compétente</b><span>' + r.address + ' · ' + r.area + '<br>' +
+      'Transmis à ' + r.org + '<br><span class="tl">Ce site engage votre sécurité.</span></span>' +
+      '<span class="go alt" data-open="' + r.id + '">Voir la fiche</span>'
+    : '<b>' + t.label + '</b><span>' + r.address + ' · ' + r.area + '<br>' + r.when + '</span>' +
+      '<span class="go" data-open="' + r.id + '">Nettoyer ce lieu</span>';
+  tip.classList.toggle('is-red', isRed(r));
+  /* On garde l'infobulle à distance du rail de filtres (bord gauche) pour ne pas
+     masquer les boutons de catégorie. */
+  tip.style.left = Math.max(150, Math.min(window.innerWidth - 130, x)) + 'px';
+  tip.style.top = Math.max(150, y) + 'px';
+  tip.classList.add('on');
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => tip.classList.remove('on'), 6000);
+}
+
+/* ── Géolocalisation réelle ── */
+function where(){
+  const n = document.getElementById('whereName'), s = document.getElementById('whereSub');
+  if (user.live){
+    n.textContent = 'Votre position';
+    s.textContent = user.acc ? 'précision ±' + Math.round(user.acc) + ' m' : 'GPS actif';
+  } else {
+    n.textContent = 'Bujumbura'; s.textContent = 'position de démo';
+  }
+}
+function locate(btn){
+  if (!('geolocation' in navigator)) return toast('Géolocalisation indisponible sur cet appareil');
+  if (btn.classList.contains('busy')) return;
+  btn.classList.add('busy'); btn.setAttribute('aria-busy','true');
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      btn.classList.remove('busy'); btn.removeAttribute('aria-busy');
+      user = { lat:pos.coords.latitude, lon:pos.coords.longitude, acc:pos.coords.accuracy, live:true };
+      where();
+      if (map){
+        map.getSource('you').setData({ type:'FeatureCollection', features:[{
+          type:'Feature', properties:{}, geometry:{ type:'Point', coordinates:[user.lon, user.lat] } }] });
+        map.flyTo({ center:[user.lon, user.lat], zoom:15.5, pitch:55, duration:2200, essential:true });
+      }
+      toast('Position actualisée' + (user.acc ? ' — précision ±' + Math.round(user.acc) + ' m' : ''));
+    },
+    err => {
+      btn.classList.remove('busy'); btn.removeAttribute('aria-busy');
+      toast(err.code === 1 ? 'Position refusée — activez la localisation dans votre navigateur'
+          : err.code === 3 ? 'Délai dépassé — réessayez dehors ou près d’une fenêtre'
+          : 'Position indisponible pour le moment');
+    },
+    { enableHighAccuracy:true, timeout:10000, maximumAge:30000 }
+  );
+}
+
+let toastT = null;
+function toast(msg){
+  const tip = document.getElementById('tip');
+  tip.innerHTML = '<b>Information</b><span>' + msg + '</span>';
+  tip.style.left = '50%'; tip.style.top = '46%';
+  tip.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => tip.classList.remove('on'), 4200);
+}
+
+/* ── Démarrage : projection globe → mercator, du Burundi vers l'utilisateur ── */
+function boot(){
+  if (typeof maplibregl === 'undefined')
+    return useFallback('Moteur cartographique indisponible — vue hors ligne du Burundi.');
+  /* Sonde WebGL 2 réelle : on demande un contexte sur un canevas hors du DOM.
+       (`new WebGL2RenderingContext()` lève une erreur même quand WebGL 2 est
+       disponible — le constructeur n'est pas exposé.) */
+    let glOK = false;
+    try { glOK = !!document.createElement('canvas').getContext('webgl2'); } catch (e) { glOK = false; }
+    if (!glOK) return useFallback('WebGL 2 absent sur cet appareil — vue hors ligne du Burundi.');
+
+  try {
+    map = new maplibregl.Map({
+      container:'map',
+      style: gsStyle(),
+      center:[HOME.lon, HOME.lat],
+      zoom:4.6,
+      pitch:0, bearing:0,
+      attributionControl:false,
+      maxZoom:ZOOM_MAX, minZoom:ZOOM_MIN
+    });
+  } catch (e) { return useFallback('Initialisation impossible — vue hors ligne du Burundi.'); }
+
+  map.touchZoomRotate.disableRotation();   // carte 2D/3D held upright : pas d'inversion de lecture
+  map.dragRotate.disable();
+  map.touchPitch.disable();
+
+  map.on('error', e => {
+    const msg = (e && e.error && e.error.message) || '';
+    if (/Failed to fetch|NetworkError|Load failed|Unauthorized|404/i.test(msg) && !map.__loaded) {
+      map.__loaded = true;
+      useFallback('Tuiles injoignables — vue hors ligne du Burundi, signalements de démonstration.');
+    }
+  });
+  map.on('idle', () => { map.__loaded = true; });
+
+  /* Pas de page de chargement : l'événement `load` n'arrive qu'une fois TOUTES les
+     sources tuilées, donc trop tard. On révèle dès le premier rendu où le style est
+     prêt — la carte est alors réellement affichable. Le verrou évite de brancher
+     les mêmes écouteurs à chaque frame. */
+  let revealed = false;
+  const reveal = () => {
+    if (revealed) return;
+    let ok = false;
+    try { ok = map.isStyleLoaded() && !!map.getLayer('pts'); } catch (e) { ok = false; }
+    if (!ok) return;
+    revealed = true;
+
+    map.on('click','pts', e => showTip(e.features[0], e.point.x, e.point.y));
+    map.on('mouseenter','pts', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave','pts', () => { map.getCanvas().style.cursor = ''; });
+    map.on('click', e => { if (!map.queryRenderedFeatures(e.point, { layers:['pts'] }).length) document.getElementById('tip').classList.remove('on'); });
+
+    applyFilter();
+    introGlobe();
+  };
+  /* `render` ne revient plus dès que la caméra est immobile : si le style finit
+     de se préparer après le dernier frame, la révélation n'aurait jamais lieu.
+     `style.load` est donc le déclencheur principal, `render` le filet de sécurité. */
+  map.on('style.load', reveal);
+  /* Un filtre clique avant la fin du chargement est rattrape ici. */
+  map.on('style.load', () => { if (filterPending) applyFilter(); });
+  map.on('render', reveal);
+  /* Le fond de carte est un service distant : s'il ne répond pas, on bascule sur le
+     repli SVG plutôt que de laisser un canevas vide à l'écran. */
+  setTimeout(() => { if (!revealed) useFallback('Tuiles injoignables — vue hors ligne du Burundi, signalements de démonstration.'); }, 20000);
+}
+
+/* Intro : globe centré sur le Burundi, puis descente jusqu'à votre position.
+   Le globe est ce que MapLibre sait faire en 3D sans le poids d'un moteur 3D dédié. */
+function introGlobe(){
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!map.setProjection) return finishIntro();
+  try {
+    map.setProjection({ type:'globe' });
+    map.jumpTo({ center:[BDI.lon, BDI.lat], zoom:1.9, pitch:0, bearing:0 });
+    if (reduce) return finishIntro(0);
+    setTimeout(() => {
+      try { map.setProjection({ type:'mercator' }); } catch (err) { /* projection fixe */ }
+      map.easeTo({ center:[HOME.lon, HOME.lat], zoom:12.4, pitch:0, bearing:0, duration:2600, easing:t => 1 - Math.pow(1 - t, 3) });
+    }, 1500);
+  } catch (err) { return finishIntro(); }
+}
+function finishIntro(delay){
+  setTimeout(() => { if (map && !map.isMoving()) map.setCenter([HOME.lon, HOME.lat]); }, delay == null ? 0 : delay);
+}
+
+function wire(){
+  /* Intégrée dans l'app : on ne garde pas le chrome local (retour, sous-titre)
+     et toute navigation repart vers la page parente, pas dans l'iframe. */
+  const EMBEDDED = window.self !== window.top;
+  if (EMBEDDED) document.body.classList.add('is-embedded');
+  const go = href => { if (EMBEDDED) window.top.location.href = href; else location.href = href; };
+
+  document.getElementById('back').addEventListener('click', () => {
+    if (history.length > 1) history.back(); else go('index.html');
+  });
+  const leg = document.getElementById('legend'), legT = document.getElementById('legendToggle');
+  const wide = window.matchMedia('(min-width:1024px)').matches;
+  leg.classList.toggle('open', wide);
+  legT.setAttribute('aria-expanded', wide ? 'true' : 'false');
+  legT.addEventListener('click', () => {
+    const o = leg.classList.toggle('open');
+    legT.setAttribute('aria-expanded', o ? 'true' : 'false');
+  });
+
+  document.getElementById('zoomIn').addEventListener('click', () => map && map.zoomIn({ duration:280 }));
+  document.getElementById('zoomOut').addEventListener('click', () => map && map.zoomOut({ duration:280 }));
+  document.getElementById('geo').addEventListener('click', e => locate(e.currentTarget));
+  document.getElementById('where').addEventListener('click', e => locate(e.currentTarget.querySelector('#geo') || e.currentTarget));
+  document.getElementById('share').addEventListener('click', () => toast('Carte copiée — partagez vos signalements'));
+
+  const tilt = document.getElementById('tilt');
+  tilt.addEventListener('click', () => {
+    if (!map) return;
+    const on = tilt.getAttribute('aria-pressed') === 'true';
+    tilt.setAttribute('aria-pressed', on ? 'false' : 'true');
+    tilt.classList.toggle('on', !on);
+    map.easeTo({ pitch:on ? 0 : 58, bearing:on ? 0 : -14, duration:900 });
+  });
+
+  document.getElementById('tip').addEventListener('click', e => {
+      const id = e.target.getAttribute && e.target.getAttribute('data-open');
+      if (!id) return;
+      /* Un signalement rouge va vers sa fiche, qui nomme l organisation. Le
+         parcours de nettoyage ne s'ouvre que sur ce qui est nettoyable. */
+      const r = REPORTS.find(x => x.id === id);
+      go(r && isRed(r) ? 'index.html#/signalement/' + id : 'index.html#/nettoyage/' + id);
+    });
+}
+
+renderChrome();
+wire();
+where();
+if (document.readyState === 'complete') boot();
+else window.addEventListener('load', boot);
+</script>
+</body>
+</html>

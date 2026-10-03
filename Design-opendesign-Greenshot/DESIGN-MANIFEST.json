@@ -1,0 +1,346 @@
+{
+  "schema": "open-design.design-manifest.v1",
+  "title": "fb55fde1-7351-4f0d-bda7-fafa8b5cfb89",
+  "entryFile": "index.html",
+  "sourceFiles": {
+    "all": [
+      "211174979726758.jpg",
+      "294704369390639815.jpg",
+      "44e188c3aac6dcf719e856b1384bafaf-Design-animated_.jpg",
+      "5207355816250683.jpg",
+      "app.js",
+      "assets/avatars/avatar-aline.svg",
+      "assets/avatars/avatar-benevole.svg",
+      "assets/avatars/avatar-camille.svg",
+      "assets/avatars/avatar-eric.svg",
+      "assets/avatars/avatar-lea.svg",
+      "assets/avatars/avatar-marc.svg",
+      "assets/avatars/avatar-nadia.svg",
+      "assets/avatars/avatar-sofia.svg",
+      "assets/avatars/avatar-tom.svg",
+      "assets/avatars/avatar-yanis.svg",
+      "assets/avatars/parts.js",
+      "assets/avatars/parts/av-dannyPhantom-laughing.svg",
+      "assets/avatars/parts/av-dannyPhantom-nervous.svg",
+      "assets/avatars/parts/av-dannyPhantom-sad.svg",
+      "assets/avatars/parts/av-dannyPhantom-smile.svg",
+      "assets/avatars/parts/av-dannyPhantom-surprised.svg",
+      "assets/avatars/parts/av-dougFunny-laughing.svg",
+      "assets/avatars/parts/av-dougFunny-nervous.svg",
+      "assets/avatars/parts/av-dougFunny-sad.svg",
+      "assets/avatars/parts/av-dougFunny-smile.svg",
+      "assets/avatars/parts/av-dougFunny-surprised.svg",
+      "assets/avatars/parts/av-fonze-laughing.svg",
+      "assets/avatars/parts/av-fonze-nervous.svg",
+      "assets/avatars/parts/av-fonze-sad.svg",
+      "assets/avatars/parts/av-fonze-smile.svg",
+      "assets/avatars/parts/av-fonze-surprised.svg",
+      "assets/avatars/parts/av-full-laughing.svg",
+      "assets/avatars/parts/av-full-nervous.svg",
+      "assets/avatars/parts/av-full-sad.svg",
+      "assets/avatars/parts/av-full-smile.svg",
+      "assets/avatars/parts/av-full-surprised.svg",
+      "assets/avatars/parts/av-mrClean-laughing.svg",
+      "assets/avatars/parts/av-mrClean-nervous.svg",
+      "assets/avatars/parts/av-mrClean-sad.svg",
+      "assets/avatars/parts/av-mrClean-smile.svg",
+      "assets/avatars/parts/av-mrClean-surprised.svg",
+      "assets/avatars/parts/av-mrT-laughing.svg",
+      "assets/avatars/parts/av-mrT-nervous.svg",
+      "assets/avatars/parts/av-mrT-sad.svg",
+      "assets/avatars/parts/av-mrT-smile.svg",
+      "assets/avatars/parts/av-mrT-surprised.svg",
+      "assets/avatars/parts/av-pixie-laughing.svg",
+      "assets/avatars/parts/av-pixie-nervous.svg",
+      "assets/avatars/parts/av-pixie-sad.svg",
+      "assets/avatars/parts/av-pixie-smile.svg",
+      "assets/avatars/parts/av-pixie-surprised.svg",
+      "assets/avatars/parts/av-turban-laughing.svg",
+      "assets/avatars/parts/av-turban-nervous.svg",
+      "assets/avatars/parts/av-turban-sad.svg",
+      "assets/avatars/parts/av-turban-smile.svg",
+      "assets/avatars/parts/av-turban-surprised.svg",
+      "carte-burundi-3d.html",
+      "content.example.js",
+      "DESIGN-1.md",
+      "DESIGN-2.md",
+      "DESIGN.md",
+      "image-1.png",
+      "image-10.png",
+      "image-11.png",
+      "image-12.png",
+      "image-2.png",
+      "image-3.png",
+      "image-4.png",
+      "image-5.png",
+      "image-6.png",
+      "image-7.png",
+      "image-8.png",
+      "image-9.png",
+      "image.png",
+      "index-1.html",
+      "index.html",
+      "Minimalist-Mobile-App-Gradient-Welcome-Screen-UI-Design.jpg",
+      "parts-manifest.json",
+      "serve.mjs",
+      "sizes.json",
+      "SKILL.md",
+      "styles.css"
+    ],
+    "html": [
+      "carte-burundi-3d.html",
+      "index-1.html",
+      "index.html"
+    ],
+    "css": [
+      "styles.css"
+    ],
+    "scriptsAndComponents": [
+      "app.js",
+      "assets/avatars/parts.js",
+      "content.example.js",
+      "serve.mjs"
+    ],
+    "assets": [
+      "211174979726758.jpg",
+      "294704369390639815.jpg",
+      "44e188c3aac6dcf719e856b1384bafaf-Design-animated_.jpg",
+      "5207355816250683.jpg",
+      "assets/avatars/avatar-aline.svg",
+      "assets/avatars/avatar-benevole.svg",
+      "assets/avatars/avatar-camille.svg",
+      "assets/avatars/avatar-eric.svg",
+      "assets/avatars/avatar-lea.svg",
+      "assets/avatars/avatar-marc.svg",
+      "assets/avatars/avatar-nadia.svg",
+      "assets/avatars/avatar-sofia.svg",
+      "assets/avatars/avatar-tom.svg",
+      "assets/avatars/avatar-yanis.svg",
+      "assets/avatars/parts/av-dannyPhantom-laughing.svg",
+      "assets/avatars/parts/av-dannyPhantom-nervous.svg",
+      "assets/avatars/parts/av-dannyPhantom-sad.svg",
+      "assets/avatars/parts/av-dannyPhantom-smile.svg",
+      "assets/avatars/parts/av-dannyPhantom-surprised.svg",
+      "assets/avatars/parts/av-dougFunny-laughing.svg",
+      "assets/avatars/parts/av-dougFunny-nervous.svg",
+      "assets/avatars/parts/av-dougFunny-sad.svg",
+      "assets/avatars/parts/av-dougFunny-smile.svg",
+      "assets/avatars/parts/av-dougFunny-surprised.svg",
+      "assets/avatars/parts/av-fonze-laughing.svg",
+      "assets/avatars/parts/av-fonze-nervous.svg",
+      "assets/avatars/parts/av-fonze-sad.svg",
+      "assets/avatars/parts/av-fonze-smile.svg",
+      "assets/avatars/parts/av-fonze-surprised.svg",
+      "assets/avatars/parts/av-full-laughing.svg",
+      "assets/avatars/parts/av-full-nervous.svg",
+      "assets/avatars/parts/av-full-sad.svg",
+      "assets/avatars/parts/av-full-smile.svg",
+      "assets/avatars/parts/av-full-surprised.svg",
+      "assets/avatars/parts/av-mrClean-laughing.svg",
+      "assets/avatars/parts/av-mrClean-nervous.svg",
+      "assets/avatars/parts/av-mrClean-sad.svg",
+      "assets/avatars/parts/av-mrClean-smile.svg",
+      "assets/avatars/parts/av-mrClean-surprised.svg",
+      "assets/avatars/parts/av-mrT-laughing.svg",
+      "assets/avatars/parts/av-mrT-nervous.svg",
+      "assets/avatars/parts/av-mrT-sad.svg",
+      "assets/avatars/parts/av-mrT-smile.svg",
+      "assets/avatars/parts/av-mrT-surprised.svg",
+      "assets/avatars/parts/av-pixie-laughing.svg",
+      "assets/avatars/parts/av-pixie-nervous.svg",
+      "assets/avatars/parts/av-pixie-sad.svg",
+      "assets/avatars/parts/av-pixie-smile.svg",
+      "assets/avatars/parts/av-pixie-surprised.svg",
+      "assets/avatars/parts/av-turban-laughing.svg",
+      "assets/avatars/parts/av-turban-nervous.svg",
+      "assets/avatars/parts/av-turban-sad.svg",
+      "assets/avatars/parts/av-turban-smile.svg",
+      "assets/avatars/parts/av-turban-surprised.svg",
+      "DESIGN-1.md",
+      "DESIGN-2.md",
+      "DESIGN.md",
+      "image-1.png",
+      "image-10.png",
+      "image-11.png",
+      "image-12.png",
+      "image-2.png",
+      "image-3.png",
+      "image-4.png",
+      "image-5.png",
+      "image-6.png",
+      "image-7.png",
+      "image-8.png",
+      "image-9.png",
+      "image.png",
+      "Minimalist-Mobile-App-Gradient-Welcome-Screen-UI-Design.jpg",
+      "parts-manifest.json",
+      "sizes.json",
+      "SKILL.md"
+    ]
+  },
+  "screens": [
+    {
+      "file": "carte-burundi-3d.html",
+      "role": "screen",
+      "implementationNote": "Preserve visual hierarchy, responsive behavior, and interactive states from this screen."
+    },
+    {
+      "file": "index-1.html",
+      "role": "screen",
+      "implementationNote": "Preserve visual hierarchy, responsive behavior, and interactive states from this screen."
+    },
+    {
+      "file": "index.html",
+      "role": "launcher-overview",
+      "implementationNote": "Use this as the navigation/overview entry only; implement each linked screen file as its own route/surface."
+    }
+  ],
+  "screenFilePolicy": {
+    "mode": "screen-file-first",
+    "entryFileRole": "launcher-overview",
+    "rules": [
+      "Each distinct user-facing screen or surface must be delivered and implemented as its own file/route.",
+      "If a landing page is present or requested, keep it in landing.html and do not merge it into the product app screen.",
+      "When multiple HTML screens exist, index.html is a launcher/overview only; it must not be treated as the combined final UI.",
+      "Keep product app screens, landing pages, platform screens, and OS widget surfaces separate in production code."
+    ]
+  },
+  "appModules": [
+    "Identify domain-specific in-app modules from the exported UI; do not reduce them to generic cards.",
+    "For each major module, implement purpose, default/loading/empty/error/success states, and responsive behavior.",
+    "Keep app modules separate from OS home-screen widgets in the production component model."
+  ],
+  "osWidgets": [
+    "If the export includes home-screen, lock-screen, Live Activity, tablet glance, or Android widget surfaces, implement them as platform quick-access surfaces outside the app UI.",
+    "If none are present, do not invent OS widgets unless the product requirements request them."
+  ],
+  "landingPage": {
+    "detection": "Inspect files and screen names for a marketing/landing page surface. If present, keep it separate from product app screens.",
+    "requiredSections": [
+      "hero",
+      "value props",
+      "product proof/screenshots",
+      "feature proof",
+      "CTA"
+    ]
+  },
+  "tokens": {
+    "source": [
+      "styles.css"
+    ],
+    "required": [
+      "background",
+      "surface",
+      "foreground",
+      "muted text",
+      "border",
+      "accent",
+      "radius",
+      "shadow",
+      "spacing",
+      "type scale",
+      "motion"
+    ],
+    "note": "Extract/freeze tokens before framework implementation so coding tools do not substitute default theme colors or typography."
+  },
+  "interactions": {
+    "source": [
+      "app.js",
+      "assets/avatars/parts.js",
+      "content.example.js",
+      "serve.mjs"
+    ],
+    "requiredStates": [
+      "default",
+      "hover",
+      "focus",
+      "active",
+      "disabled",
+      "loading",
+      "empty",
+      "error",
+      "success"
+    ],
+    "requiredBehaviors": [
+      "forms/validation where present",
+      "tabs/filters where present",
+      "dialogs/sheets/drawers where present",
+      "copy/generate/share actions where present",
+      "player or quick controls where present"
+    ],
+    "note": "If the prototype is static, derive missing behavior from visible controls and document it before coding."
+  },
+  "responsiveViewports": [
+    {
+      "name": "mobile-compact",
+      "width": 360,
+      "height": 800,
+      "category": "mobile",
+      "mustAvoidHorizontalScroll": true
+    },
+    {
+      "name": "mobile-standard",
+      "width": 390,
+      "height": 844,
+      "category": "mobile",
+      "mustAvoidHorizontalScroll": true
+    },
+    {
+      "name": "mobile-large",
+      "width": 430,
+      "height": 932,
+      "category": "mobile",
+      "mustAvoidHorizontalScroll": true
+    },
+    {
+      "name": "foldable-small-tablet",
+      "width": 600,
+      "height": 960,
+      "category": "foldable-tablet",
+      "mustAvoidHorizontalScroll": true
+    },
+    {
+      "name": "tablet-portrait",
+      "width": 820,
+      "height": 1180,
+      "category": "tablet",
+      "mustAvoidHorizontalScroll": true
+    },
+    {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768,
+      "category": "tablet",
+      "mustAvoidHorizontalScroll": true
+    },
+    {
+      "name": "laptop",
+      "width": 1366,
+      "height": 768,
+      "category": "desktop",
+      "mustAvoidHorizontalScroll": true
+    },
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900,
+      "category": "desktop",
+      "mustAvoidHorizontalScroll": true
+    },
+    {
+      "name": "wide",
+      "width": 1920,
+      "height": 1080,
+      "category": "wide",
+      "mustAvoidHorizontalScroll": true
+    }
+  ],
+  "implementationChecklist": [
+    "Open entryFile first and map screens, modules, tokens, and interactions.",
+    "Extract tokens before writing framework components.",
+    "Implement app-specific modules with real states instead of generic card grids.",
+    "Preserve or rebuild JS interactions for meaningful UX actions.",
+    "Validate screenshots at desktop/tablet/mobile viewports with no horizontal overflow.",
+    "Keep landing pages, in-app modules, and OS widgets as separate implementation surfaces."
+  ]
+}

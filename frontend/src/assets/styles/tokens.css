@@ -1,0 +1,857 @@
+/* ============================================================================
+   Greenshot — Design tokens
+   Source de vérité : Design-opendesign-Greenshot/index.html, bloc <style>
+   Lignes 11 à 1126. Ne pas modifier ces valeurs sans mettre à jour
+   Design-opendesign-Greenshot/DESIGN-Greenshot.md
+   ========================================================================== */
+
+:root {
+  /* Surfaces sombres */
+  --forest: #122314;
+  --forest-2: #0e1c10;
+  --forest-3: #0a1509;
+  --panel: #172a19;
+  --panel-2: #1e3520;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-2: #2c4630;
+
+  /* Accents */
+  --sprout: #68ef3f;
+  --sprout-2: #8ff56a;
+  --verdant: #26a200;
+
+  /* Texte sur sombre */
+  --white: #ffffff;
+  --fern: #b7bda5;
+  --lichen: #a7ac9a;
+
+  /* Surfaces claires */
+  --bone: #f2f5eb;
+  --wash: #e7f9dd;
+  --onyx: #30322a;
+
+  /* Sémantique */
+  --amber: #f2c14e;
+  --danger: #ff7452;
+
+  /* Formes */
+  --r-pill: 999px;
+  --r-card: 20px;
+  --r-sm: 14px;
+  --r-xs: 10px;
+
+  /* Mouvement */
+  --dur-1: 170ms;
+  --dur-2: 260ms;
+  --dur-3: 400ms;
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Typographie */
+  --font-display: 'Boldonse', system-ui, -apple-system, sans-serif;
+  --font-ui: 'Geist', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Gouttières */
+  --gutter: clamp(20px, 4vw, 64px);
+  --gap: 13px;
+}
+
+/* ============================================================================
+   Base
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--white);
+  background:
+    radial-gradient(circle at 50% -8%, rgba(104, 239, 63, 0.12), transparent 42%) fixed,
+    var(--forest-3);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+a,
+button,
+input,
+select,
+textarea,
+label {
+  touch-action: manipulation;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* Focus visible et cohérent sur toutes les cibles interactives.
+   Exigence WCAG AA : le contour ne doit jamais être supprimé. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--sprout);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* Préférence système : on réduit le mouvement, on ne le supprime pas.
+   L'apparition de la barre de progression reste utile, elle devient immédiate. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   Coquille applicative — mobile d'abord
+   ========================================================================== */
+
+.gs-app {
+  position: relative;
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'main'
+    'nav';
+  background: var(--forest);
+  color: var(--white);
+}
+
+@media (min-width: 1024px) {
+  .gs-app {
+    grid-template-columns: 266px minmax(0, 1fr);
+    grid-template-rows: 100dvh;
+    grid-template-areas:
+      'nav main';
+  }
+}
+
+@media (min-width: 1440px) {
+  .gs-app {
+    grid-template-columns: 288px minmax(0, 1fr);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Écrans hors cadre : onboarding et authentification sont plein écran.
+   `:has()` évite de conditionner la coquille dans App.vue sur route.path,
+   ce qui créait un décalage au premier rendu. La coquille s'efface d'elle-
+   même quand la page fill contient .onb ou .auth.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.gs-app:has(> .gs-main > .onb),
+.gs-app:has(> .gs-main > .auth) {
+  display: block;
+  height: auto;
+  min-height: 100dvh;
+  grid-template-columns: none;
+  grid-template-rows: none;
+  grid-template-areas: none;
+  background: var(--forest-3);
+}
+
+.gs-app:has(> .gs-main > .onb) .gs-main,
+.gs-app:has(> .gs-main > .auth) .gs-main {
+  overflow: visible;
+}
+
+.gs-app:has(> .gs-main > .onb) > .gs-nav,
+.gs-app:has(> .gs-main > .auth) > .gs-nav {
+  display: none;
+}
+
+.gs-main {
+  grid-area: main;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.gs-main::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================================
+   Barre d'écran
+   ========================================================================== */
+
+.sbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(30px + env(safe-area-inset-top)) 20px 18px;
+  background: linear-gradient(to bottom, var(--forest) 62%, rgba(18, 35, 20, 0.74));
+  backdrop-filter: blur(14px);
+}
+
+.sbar__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.sbar__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.sbar__sub {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--fern);
+  letter-spacing: 0.005em;
+}
+
+.sbar::after {
+  content: '';
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(104, 239, 63, 0.22) 22%,
+    rgba(104, 239, 63, 0.22) 78%,
+    transparent
+  );
+}
+
+.sbar > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ≥1024px — une ligne de 90 caractères ne se lit pas. On centre le parcours
+   sur 920px plutôt que d'étirer la page.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@media (min-width: 1024px) {
+  .sbar {
+    position: static;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 28px 32px 4px;
+    background: none;
+    backdrop-filter: none;
+  }
+
+  .sbar::after {
+    display: none;
+  }
+
+  .gs-pad {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 6px 32px 48px;
+  }
+
+  .statstrip {
+    gap: 14px;
+  }
+}
+
+/* ============================================================================
+   Primitives de mise en page
+   ========================================================================== */
+
+.gs-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.gs-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gs-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+}
+
+.gs-fill {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gs-pad {
+  padding: 22px 20px 40px;
+}
+
+/* ============================================================================
+   Boutons
+   ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 20px;
+  border-radius: var(--r-sm);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  transition:
+    transform var(--dur-1) var(--ease-out),
+    filter var(--dur-1) var(--ease-out),
+    background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out);
+}
+
+.btn:active {
+  transform: scale(0.975);
+}
+
+.btn--primary {
+  background: var(--sprout);
+  color: var(--onyx);
+}
+
+.btn--primary:hover {
+  filter: brightness(1.07);
+}
+
+.btn--secondary {
+  background: transparent;
+  color: var(--white);
+  border: 1px solid var(--line-2);
+}
+
+.btn--secondary:hover {
+  border-color: var(--sprout);
+  color: var(--sprout);
+}
+
+.btn--light {
+  background: var(--onyx);
+  color: var(--bone);
+}
+
+.btn--light:hover {
+  background: #3b3d33;
+}
+
+.btn--block {
+  width: 100%;
+}
+
+.btn--sm {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+.btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.iconbtn {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--fern);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  transition:
+    color var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out);
+}
+
+.iconbtn:hover {
+  color: var(--white);
+  border-color: var(--line-2);
+}
+
+.ic {
+  width: 22px;
+  height: 22px;
+  display: block;
+  flex: none;
+}
+
+.ic--sm {
+  width: 18px;
+  height: 18px;
+}
+
+.ic--xs {
+  width: 15px;
+  height: 15px;
+}
+
+.ic--lg {
+  width: 26px;
+  height: 26px;
+}
+
+/* ============================================================================
+   Pastilles, cartes, sections
+   ========================================================================== */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 13px;
+  border-radius: var(--r-pill);
+  background: var(--wash);
+  color: var(--onyx);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--verdant);
+  flex: none;
+}
+
+.pill--dark {
+  background: rgba(104, 239, 63, 0.14);
+  color: var(--sprout);
+  border: 1px solid rgba(104, 239, 63, 0.3);
+}
+
+.pill--dark .pill__dot {
+  background: var(--sprout);
+}
+
+.pill--ghost {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fern);
+  border: 1px solid var(--line);
+}
+
+.pill--ghost .pill__dot {
+  background: var(--fern);
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 18px;
+}
+
+.card--light {
+  background: var(--bone);
+  color: var(--onyx);
+  border-color: transparent;
+}
+
+.card--flat {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.h-sec {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 28px 0 12px;
+}
+
+.h-sec__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.h-sec__link {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--sprout);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.muted {
+  color: var(--fern);
+}
+
+.dim {
+  color: var(--lichen);
+}
+
+/* ============================================================================
+   Carte héros — points et niveau
+   ========================================================================== */
+
+.hero-card {
+  padding: 22px;
+  border-radius: 24px;
+  background: linear-gradient(150deg, var(--bone), #e9eee0);
+  color: var(--onyx);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-card::after {
+  content: '';
+  position: absolute;
+  right: -46px;
+  top: -58px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 40% 40%,
+    rgba(104, 239, 63, 0.5),
+    rgba(38, 162, 0, 0.06) 62%,
+    transparent 72%
+  );
+}
+
+.hero-card__lvl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4f5546;
+  line-height: 1.3;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-card__pts {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(38px, 12vw, 50px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin: 12px 0 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-card__pts small {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: #5c6250;
+}
+
+.hero-card__to-next {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #5c6250;
+  line-height: 1.5;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-card__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  position: relative;
+  z-index: 1;
+  flex-wrap: wrap;
+}
+
+.hero-card .btn--secondary {
+  color: var(--onyx);
+  border-color: rgba(48, 50, 42, 0.3);
+}
+
+.hero-card .btn--secondary:hover {
+  color: #1b1d17;
+  border-color: var(--onyx);
+  background: rgba(48, 50, 42, 0.08);
+}
+
+.xp {
+  margin-top: 14px;
+  height: 10px;
+  border-radius: 99px;
+  background: rgba(48, 50, 42, 0.14);
+  overflow: hidden;
+}
+
+.xp__fill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--verdant), var(--sprout));
+  transform-origin: left;
+  animation: xpFill var(--dur-3) var(--ease-out) both;
+}
+
+@keyframes xpFill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ============================================================================
+   Bandeau de statistiques
+   ========================================================================== */
+
+.statstrip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.stat {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 14px 14px 15px;
+}
+
+.stat__value {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  color: var(--sprout);
+}
+
+.stat__label {
+  font-size: 12.5px;
+  color: var(--fern);
+  line-height: 1.45;
+  display: block;
+  margin-top: 5px;
+}
+
+/* ============================================================================
+   Rangée d'action
+   ========================================================================== */
+
+.rowcard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 15px 16px;
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  text-align: left;
+  transition:
+    border-color var(--dur-1) var(--ease-out),
+    background var(--dur-1) var(--ease-out);
+}
+
+.rowcard:hover {
+  border-color: var(--line-2);
+  background: var(--panel-2);
+}
+
+.rowcard__icon {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(104, 239, 63, 0.12);
+  color: var(--sprout);
+  border: 1px solid rgba(104, 239, 63, 0.22);
+}
+
+.rowcard__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: block;
+}
+
+.rowcard__title {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.35;
+}
+
+.rowcard__sub {
+  display: block;
+  font-size: 13px;
+  color: var(--fern);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.rowcard__meta {
+  flex: none;
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+  align-content: center;
+}
+
+.rowcard__pts {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--sprout);
+  white-space: nowrap;
+}
+
+.chev {
+  color: var(--lichen);
+  flex: none;
+}
+
+/* ============================================================================
+   Navigation basse
+   ========================================================================== */
+
+.gs-nav {
+  grid-area: nav;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  background: var(--forest);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.navitem {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  padding: 9px 4px 10px;
+  color: var(--fern);
+  font-size: 11px;
+  font-weight: 600;
+  transition: color var(--dur-1) var(--ease-out);
+}
+
+.navitem:hover {
+  color: var(--white);
+}
+
+.navitem.is-active {
+  color: var(--sprout);
+}
+
+/* ============================================================================
+   État vide
+   La base est vide en V1. C'est l'état par défaut, pas une exception.
+   On explique l'action attendue plutôt que d'afficher un espace blanc.
+   ========================================================================== */
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 34px 20px 38px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-card);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.empty__icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: rgba(104, 239, 63, 0.1);
+  color: var(--sprout);
+  border: 1px solid rgba(104, 239, 63, 0.2);
+}
+
+.empty__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--white);
+  margin: 0;
+}
+
+.empty__text {
+  font-size: 13.5px;
+  color: var(--fern);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 34ch;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xp__fill {
+    animation: none;
+  }
+}

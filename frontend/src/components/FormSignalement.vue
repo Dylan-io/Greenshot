@@ -1,150 +1,144 @@
 <template>
-  <div class="form-signalement-container">
-    <form @submit.prevent="soumettreSignalement" class="signalement-form">
-      
-      <!-- 1. Prise de Photo -->
-      <div class="form-group">
-        <label class="label-title">📸 1. Prenez une photo du problème environnemental :</label>
-        <input 
-          type="file" 
-          accept="image/*" 
-          capture="environment" 
-          required 
+  <form novalidate @submit.prevent="soumettreSignalement">
+    <section class="card step">
+      <p class="eyebrow">Étape 1</p>
+      <h2 class="step__title">Photo du déchet</h2>
+      <p class="step__hint">
+        Une photo nette accélère la validation. Elle est compressée automatiquement
+        avant l'envoi pour économiser votre data.
+      </p>
+
+      <label class="dropzone" :class="{ 'has-preview': photoPreview }">
+        <input
+          type="file"
+          class="dropzone__input"
+          accept="image/*"
+          capture="environment"
+          required
           @change="gererSelectionPhoto"
-          class="file-input"
         />
-        <small class="compress-notice">⚡ Compression automatique appliquée avant envoi pour économiser votre data.</small>
+        <img v-if="photoPreview" :src="photoPreview" alt="Aperçu du déchet photographié" class="dropzone__preview" />
+        <span v-else class="dropzone__cta">
+          <svg class="ic ic--lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+            <path d="M4 8h3l2-2h6l2 2h3v11H4z" stroke-linejoin="round" />
+            <circle cx="12" cy="13" r="3.2" />
+          </svg>
+          <span class="dropzone__label">Prendre une photo</span>
+        </span>
+      </label>
+      <span class="sr-only">
+        La photo du déchet est obligatoire. Ouvrez l'appareil photo ou choisissez un fichier.
+      </span>
+    </section>
 
-        <div v-if="photoPreview" class="preview-container">
-          <img :src="photoPreview" alt="Aperçu photo" class="preview-img" />
-        </div>
+    <section class="card step">
+      <p class="eyebrow">Étape 2</p>
+      <h2 class="step__title">Type de déchet</h2>
+
+      <div class="choices" role="radiogroup" aria-label="Type de déchet">
+        <button
+          v-for="cat in categoriesDisponibles"
+          :key="cat.id"
+          type="button"
+          role="radio"
+          class="choice"
+          :class="{ 'is-on': categorieChoisie === cat.id }"
+          :aria-checked="categorieChoisie === cat.id"
+          @click="categorieChoisie = cat.id"
+        >
+          {{ cat.nom }}
+        </button>
       </div>
 
-      <!-- 2. Géolocalisation automatique (modifiable) -->
-      <div class="form-group">
-        <label class="label-title">📍 2. Localisation GPS :</label>
-        <div v-if="gpsEnCours" class="gps-status checking">
-          🛰️ Recherche du signal satellite GPS en cours...
-        </div>
-        <div v-else-if="gpsCoordonnees" class="gps-status success">
-          ✅ Coordonnées capturées : {{ Number(gpsCoordonnees.lat).toFixed(5) }}, {{ Number(gpsCoordonnees.lng).toFixed(5) }}
-        </div>
-        <div v-else class="gps-status warning">
-          ⚠️ GPS non capturé. <button type="button" @click="capturerGps" class="btn-gps">Réessayer</button>
-        </div>
+      <p v-if="categoriesSecours" class="alert alert--warn" role="status">
+        Connexion à la base impossible. Les catégories affichées ne sont pas soumissibles.
+      </p>
+    </section>
 
-        <!--
-          Le GPS est capturé automatiquement à l'ouverture du formulaire.
-          Certains endroits (sous un toit, ruelle étroite, GPS erratique)
-          donnent une position imprécise : l'utilisateur peut donc corriger
-          les coordonnées à la main. La correction manuelle est prioritaire,
-          la capture automatique ne s'exécutant qu'une fois au chargement.
-        -->
-        <div v-if="gpsCoordonnees" class="gps-edit">
-          <p class="gps-edit-help">
-            Si l'endroit est mal identifié (GPS faible, sous un toit…), corrigez les coordonnées :
-          </p>
-          <div class="gps-inputs">
-            <label class="gps-input-label">
-              Latitude
-              <input
-                v-model.number="gpsCoordonnees.lat"
-                type="number"
-                step="0.0000001"
-                min="-90"
-                max="90"
-                class="text-input"
-              />
-            </label>
-            <label class="gps-input-label">
-              Longitude
-              <input
-                v-model.number="gpsCoordonnees.lng"
-                type="number"
-                step="0.0000001"
-                min="-180"
-                max="180"
-                class="text-input"
-              />
-            </label>
-          </div>
-          <div class="gps-actions">
-            <button type="button" @click="capturerGps" class="btn-gps">
-              📡 Recapturer
-            </button>
-            <span v-if="gpsModifie" class="gps-modified">✏️ Position corrigée manuellement</span>
-          </div>
-        </div>
+    <section class="card step">
+      <p class="eyebrow">Étape 3</p>
+      <h2 class="step__title">Emplacement</h2>
 
-        <div v-if="erreurGps" class="gps-status warning">
-          {{ erreurGps }}
-        </div>
-      </div>
+      <p v-if="gpsEnCours" class="alert" role="status">
+        Recherche du signal GPS…
+      </p>
 
-      <!-- 3. Choix de la catégorie -->
-      <div class="form-group">
-        <label class="label-title">🏷️ 3. Catégorie du problème :</label>
-        <select v-model="categorieChoisie" required class="select-input">
-          <option value="" disabled>Sélectionnez une catégorie</option>
-          <option v-for="cat in categoriesDisponibles" :key="cat.id" :value="cat.id">
-            {{ cat.nom }} (+{{ cat.points_signalement || 10 }} pts)
-          </option>
+      <template v-else-if="gpsCoordonnees">
+        <p class="alert alert--ok" role="status">
+          Position détectée · précision {{ precisionGps ?? '—' }} m
+        </p>
+        <p class="step__hint">Sous un toit ou dans une ruelle, corrigez à la main :</p>
+        <div class="coords">
+          <label class="field">
+            <span class="field__label">Latitude</span>
+            <input
+              v-model.number="gpsCoordonnees.lat"
+              type="number"
+              step="0.0000001"
+              min="-5"
+              max="-2"
+              class="field__control"
+              required
+            />
+          </label>
+          <label class="field">
+            <span class="field__label">Longitude</span>
+            <input
+              v-model.number="gpsCoordonnees.lng"
+              type="number"
+              step="0.0000001"
+              min="28"
+              max="32"
+              class="field__control"
+              required
+            />
+          </label>
+        </div>
+        <button type="button" class="btn btn--secondary btn--sm" @click="capturerGps">
+          Recapturer
+        </button>
+        <p v-if="gpsModifie" class="step__hint">Position corrigée manuellement.</p>
+      </template>
+
+      <template v-else>
+        <p class="alert alert--warn" role="status">
+          {{ erreurGps || 'Position GPS introuvable.' }}
+        </p>
+        <button type="button" class="btn btn--secondary btn--sm" @click="capturerGps">
+          Réessayer
+        </button>
+      </template>
+
+      <label class="field">
+        <span class="field__label">Ville</span>
+        <select v-model="ville" class="field__control">
+          <option value="Bujumbura">Bujumbura</option>
+          <option value="Gitega">Gitega</option>
+          <option value="Ngozi">Ngozi</option>
         </select>
-      </div>
+      </label>
+    </section>
 
-      <!-- 4. Ville / Commune -->
-      <div class="form-group">
-        <label class="label-title">🏙️ 4. Ville / Commune :</label>
-        <input 
-          type="text" 
-          v-model="ville" 
-          placeholder="Ex: Bujumbura (Mukaza, Rohero...)" 
-          class="text-input"
-        />
-      </div>
+    <section class="card step">
+      <label class="field">
+        <span class="field__label">Description (facultatif)</span>
+        <textarea v-model="description" rows="3" class="field__control" placeholder="Précisez si nécessaire." />
+      </label>
+    </section>
 
-      <!-- 5. Description optionnelle -->
-      <div class="form-group">
-        <label class="label-title">📝 5. Brève description (optionnelle) :</label>
-        <textarea 
-          v-model="description" 
-          placeholder="Précisez la nature des déchets ou l'accès..." 
-          rows="3"
-          class="textarea-input"
-        ></textarea>
-      </div>
+    <p v-if="raisonBloquant" class="alert alert--warn" role="status">{{ raisonBloquant }}</p>
+    <p v-if="messageErreur" class="alert alert--err" role="alert">{{ messageErreur }}</p>
+    <p v-if="messageSucces" class="alert alert--ok" role="status">{{ messageSucces }}</p>
 
-      <div v-if="raisonBloquant" class="alert-error">
-        ⚠️ {{ raisonBloquant }}
-        <RouterLink v-if="!userStore.isAuthenticated" to="/connexion" class="alert-link">
-          Se connecter
-        </RouterLink>
-      </div>
-
-      <div v-if="messageErreur" class="alert-error">
-        {{ messageErreur }}
-      </div>
-
-      <div v-if="messageSucces" class="alert-success">
-        🎉 {{ messageSucces }}
-      </div>
-
-      <!-- Bouton Soumission -->
-      <button
-        type="submit"
-        class="btn-submit"
-        :disabled="envoiEnCours || !peutEnvoyer"
-      >
-        <span v-if="envoiEnCours">Compression et téléversement en cours...</span>
-        <span v-else>Envoyer mon signalement citoyen</span>
-      </button>
-    </form>
-  </div>
+    <button type="submit" class="btn btn--primary btn--block" :disabled="!peutEnvoyer || envoiEnCours">
+      {{ envoiEnCours ? 'Envoi en cours…' : 'Publier le signalement' }}
+    </button>
+  </form>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { supabase, supabaseConfigured } from '../services/supabaseClient'
 import { useUserStore } from '../stores/userStore'
 import imageCompression from 'browser-image-compression'
@@ -157,6 +151,7 @@ const photoPreview = ref(null)
 const gpsCoordonnees = ref(null)
 const gpsEnCours = ref(false)
 const gpsModifie = ref(false)
+const precisionGps = ref(null)
 const erreurGps = ref('')
 const categoriesDisponibles = ref([])
 const categorieChoisie = ref('')
@@ -194,6 +189,7 @@ function capturerGps() {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude
       }
+      precisionGps.value = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null
       gpsEnCours.value = false
     },
     (err) => {
@@ -233,7 +229,7 @@ function validerGps() {
   }
 
   if (lat < -5 || lat > -2 || lng < 28 || lng > 32) {
-    erreurGps.value = 'Ces coordonnées sont hors du Burundi. Vérifiez la saisie, ou utilisez 📡 Recapturer.'
+    erreurGps.value = 'Ces coordonnées sont hors du Burundi. Vérifiez la saisie, ou utilisez Recapturer.'
     return false
   }
 
@@ -389,7 +385,7 @@ async function soumettreSignalement() {
       throw insertErr
     }
 
-    messageSucces.value = 'Votre signalement a été enregistré avec succès ! Vos points ont été crédités.'
+    messageSucces.value = 'Votre signalement a été enregistré. Vos points ont été crédités.'
     setTimeout(() => {
       router.push('/carte')
     }, 1500)
@@ -404,188 +400,182 @@ async function soumettreSignalement() {
 </script>
 
 <style scoped>
-.form-signalement-container {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 1.25rem;
+.step {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
-.form-group {
-  margin-bottom: 1.25rem;
-}
-
-.label-title {
-  display: block;
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: #1e293b;
-  margin-bottom: 0.4rem;
-}
-
-.file-input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-}
-
-.compress-notice {
-  display: block;
-  font-size: 0.75rem;
-  color: #059669;
-  margin-top: 0.25rem;
-}
-
-.preview-container {
-  margin-top: 0.5rem;
-  text-align: center;
-}
-
-.preview-img {
-  max-height: 180px;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-}
-
-.gps-status {
-  padding: 0.6rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-}
-
-.gps-status.checking {
-  background: #EFF6FF;
-  color: #1E40AF;
-  border: 1px solid #BFDBFE;
-}
-
-.gps-status.success {
-  background: #ECFDF5;
-  color: #065F46;
-  border: 1px solid #A7F3D0;
-}
-
-.gps-status.warning {
-  background: #FFFBEB;
-  color: #92400E;
-  border: 1px solid #FDE68A;
-}
-
-.btn-gps {
-  margin-left: 0.5rem;
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  background: #F59E0B;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-/* --- Correction manuelle de la position GPS --- */
-.gps-edit {
-  margin-top: 0.6rem;
-  padding: 0.75rem;
-  background: #F8FAFC;
-  border: 1px dashed #CBD5E1;
-  border-radius: 6px;
-}
-
-.gps-edit-help {
-  margin: 0 0 0.5rem;
-  font-size: 0.78rem;
-  color: #64748B;
-  line-height: 1.4;
-}
-
-.gps-inputs {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.gps-input-label {
-  flex: 1;
-  font-size: 0.75rem;
-  color: #475569;
-  font-weight: 500;
-}
-
-.gps-input-label .text-input {
-  margin-top: 0.2rem;
-  font-size: 0.85rem;
-}
-
-.gps-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-.gps-actions .btn-gps {
-  margin-left: 0;
-}
-
-.gps-modified {
-  font-size: 0.72rem;
-  color: #92400E;
-  font-weight: 500;
-}
-
-.alert-link {
-  color: #1E40AF;
+.step__title {
+  margin: 0;
+  font-size: 17px;
   font-weight: 600;
-  text-decoration: underline;
-  margin-left: 0.35rem;
+  letter-spacing: -0.01em;
 }
 
-.select-input, .text-input, .textarea-input {
-  width: 100%;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  color: #1e293b;
+.step__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fern);
+  line-height: 1.5;
 }
 
-.alert-error {
-  padding: 0.75rem;
-  background: #FEF2F2;
-  color: #991B1B;
-  border-radius: 6px;
-  margin-bottom: 1rem;
-  font-size: 0.85rem;
-}
-
-.alert-success {
-  padding: 0.75rem;
-  background: #ECFDF5;
-  color: #065F46;
-  border-radius: 6px;
-  margin-bottom: 1rem;
-  font-size: 0.85rem;
-}
-
-.btn-submit {
-  width: 100%;
-  padding: 0.85rem;
-  background: #10B981;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 700;
+.dropzone {
+  display: grid;
+  place-items: center;
+  min-height: 168px;
+  padding: 16px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
-  transition: background 0.15s ease;
+  overflow: hidden;
+  position: relative;
 }
 
-.btn-submit:hover {
-  background: #059669;
+.dropzone:hover {
+  border-color: var(--sprout);
 }
 
-.btn-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.dropzone__input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.dropzone__cta {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: var(--sprout);
+}
+
+.dropzone__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.dropzone__preview {
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  border-radius: var(--r-xs);
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice {
+  min-height: 44px;
+  padding: 0 15px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--fern);
+  font-size: 13.5px;
+  font-weight: 600;
+  transition:
+    background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out);
+}
+
+.choice:hover {
+  color: var(--white);
+  border-color: var(--line-2);
+}
+
+.choice.is-on {
+  background: var(--sprout);
+  border-color: var(--sprout);
+  color: var(--onyx);
+}
+
+.coords {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+}
+
+.field__label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--lichen);
+}
+
+.field__control {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 13px;
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--white);
+  font: inherit;
+  font-size: 15px;
+  resize: vertical;
+}
+
+.field__control::placeholder {
+  color: var(--lichen);
+}
+
+.field__control:hover {
+  border-color: var(--line-2);
+}
+
+.alert {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: var(--r-xs);
+  font-size: 13px;
+  line-height: 1.5;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fern);
+  border: 1px solid var(--line);
+}
+
+.alert--ok {
+  background: rgba(104, 239, 63, 0.12);
+  color: var(--sprout);
+  border-color: rgba(104, 239, 63, 0.3);
+}
+
+.alert--warn {
+  background: rgba(242, 193, 78, 0.12);
+  color: var(--amber);
+  border-color: rgba(242, 193, 78, 0.3);
+}
+
+.alert--err {
+  background: rgba(255, 116, 82, 0.12);
+  color: var(--danger);
+  border-color: rgba(255, 116, 82, 0.3);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

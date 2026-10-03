@@ -1,0 +1,51 @@
+/* ============================================================================
+   Greenshot — styles globaux
+   L'ordre d'import est significatif : tokens définit les variables,
+   base dépend de tokens.
+   ========================================================================== */
+
+@import './tokens.css';
+
+/* Carte Leaflet : le fond du site est sombre, on aligne les contrôles.
+   Les tuiles CARTO dark_all s'accordent avec --forest. */
+.leaflet-container {
+  background: var(--forest-2);
+  font-family: var(--font-ui);
+  border-radius: var(--r-sm);
+}
+
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  background: var(--panel);
+  color: var(--white);
+  border-color: var(--line);
+}
+
+.leaflet-bar a:hover {
+  background: var(--panel-2);
+  color: var(--sprout);
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--panel);
+  color: var(--white);
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.leaflet-control-attribution {
+  background: rgba(10, 21, 9, 0.8) !important;
+  color: var(--lichen) !important;
+  font-size: 10px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--fern) !important;
+}
