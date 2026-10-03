@@ -48,7 +48,6 @@ onMounted(() => {
 async function renvoyerVerification() {
   await userStore.renvoyerVerification()
 }
-
 </script>
 
 <style>
@@ -159,8 +158,6 @@ h1, h2, h3, h4, .font-title {
 .brand-title span {
   color: var(--color-amber, #E8A33D);
 }
-
-
 
 /* Bannière de vérification email */
 .verification-banner {

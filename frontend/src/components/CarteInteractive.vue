@@ -25,20 +25,19 @@
     <div class="floating-legend" :class="{ 'legend-expanded': !legendCollapsed }">
       <button type="button" class="legend-header-btn" @click="legendCollapsed = !legendCollapsed">
         <span class="legend-badge-dot"></span>
-        <span class="legend-title">Légende des statuts</span>
+        <span class="legend-title">Catégories signalées</span>
         <span class="legend-chevron">{{ legendCollapsed ? '▲' : '▼' }}</span>
       </button>
 
       <div v-show="!legendCollapsed" class="legend-body">
         <div 
-          v-for="(config, statusKey) in MAP_CONFIG.statusConfig" 
-          :key="statusKey"
+          v-for="(config, categoryKey) in MAP_CONFIG.categoryConfig"
+          :key="categoryKey"
           class="legend-row"
         >
-          <img :src="config.iconUrl" alt="Épingle" class="legend-pin" />
+          <span class="legend-category-pin" :style="{ backgroundColor: config.color }" aria-hidden="true">{{ config.icon }}</span>
           <div class="legend-info">
             <span class="legend-label" :style="{ color: config.color }">{{ config.label }}</span>
-            <small class="legend-desc">{{ config.description }}</small>
           </div>
         </div>
       </div>
@@ -47,7 +46,7 @@
     <!-- Fiche Flottante en Bas d'Écran (Bottom Sheet) au clic sur une épingle -->
     <transition name="slide-up">
       <div v-if="selectedSignalement" class="bottom-sheet-card" role="dialog" aria-modal="true">
-        <button type="button" class="btn-close-sheet" @click="fermerFiche" aria-label="Fermer">✕</button>
+        <button type="button" class="btn-close-sheet" @click="fermerFiche" aria-label="Fermer"><Icone nom="fermer" /></button>
 
         <div class="sheet-content">
           <!-- Vignette photo -->
@@ -77,7 +76,7 @@
 
               <!-- Distance approximative depuis l'utilisateur -->
               <span v-if="distanceUtilisateur" class="sheet-distance">
-                📍 À {{ distanceUtilisateur }}
+                <Icone nom="localisation" /> À {{ distanceUtilisateur }}
               </span>
             </div>
 
@@ -94,7 +93,7 @@
                 class="btn-voir-detail" 
                 @click="allerAuDetail(selectedSignalement.id)"
               >
-                Voir le détail →
+                Voir le détail <Icone nom="fleche_droite" />
               </button>
             </div>
           </div>
@@ -109,7 +108,8 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import L from 'leaflet'
-import { MAP_CONFIG, normaliserStatut, calculerDistance } from '../config/mapConfig'
+import { MAP_CONFIG, normaliserCategorie, normaliserStatut, calculerDistance } from '../config/mapConfig'
+import Icone from './Icone.vue'
 
 const props = defineProps({
   signalements: {
@@ -168,22 +168,24 @@ const distanceUtilisateur = computed(() => {
 function initialiserCarte() {
   if (!mapContainer.value) return
 
-  // 1. Initialiser Leaflet centré sur Bujumbura (zoom 12)
+  // 1. Vue initiale centrée sur le Burundi
   mapInstance = L.map(mapContainer.value, {
     center: MAP_CONFIG.defaultCenter,
     zoom: MAP_CONFIG.defaultZoom,
     minZoom: MAP_CONFIG.minZoom,
     maxZoom: MAP_CONFIG.maxZoom,
+    maxBounds: L.latLngBounds(MAP_CONFIG.burundiBounds),
+    maxBoundsViscosity: 0.85,
     zoomControl: false // Nous utilisons les contrôles personnalisés ergonomiques mobile
   })
 
-  // 2. Fond de tuiles CARTO Voyager (Clair, moderne, sans clé API)
-  const cartoLayer = MAP_CONFIG.tileLayers.voyager
-  L.tileLayer(cartoLayer.url, {
-    attribution: cartoLayer.attribution,
-    subdomains: 'abcd',
+  // 2. Routes et lieux OpenStreetMap, sans clé CARTO
+  const mapLayer = MAP_CONFIG.tileLayers.openStreetMap
+  L.tileLayer(mapLayer.url, {
+    attribution: mapLayer.attribution,
     maxZoom: 19
   }).addTo(mapInstance)
+  L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(mapInstance)
 
   // 3. Calque de marqueurs
   markersLayer = L.layerGroup().addTo(mapInstance)
@@ -197,15 +199,16 @@ function initialiserCarte() {
   }
 }
 
-function creerIconeStatut(statut) {
-  const statutClean = normaliserStatut(statut)
-  const config = MAP_CONFIG.statusConfig[statutClean] || MAP_CONFIG.statusConfig.en_attente
+function creerIconeCategorie(nomCategorie) {
+  const categorie = normaliserCategorie(nomCategorie)
+  const config = MAP_CONFIG.categoryConfig[categorie]
 
-  return L.icon({
-    iconUrl: config.iconUrl,
-    iconSize: [30, 40],
-    iconAnchor: [15, 40],
-    popupAnchor: [0, -36]
+  return L.divIcon({
+    className: 'category-marker-container',
+    html: `<span aria-label="${config.label}" style="display:grid;place-items:center;width:36px;height:36px;border:3px solid #fff;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:${config.color};box-shadow:0 2px 8px #0005;color:#fff;font-size:19px;font-weight:800"><span style="transform:rotate(45deg)">${config.icon}</span></span>`,
+    iconSize: [38, 44],
+    iconAnchor: [19, 42],
+    popupAnchor: [0, -40]
   })
 }
 
@@ -218,7 +221,7 @@ function mettreAJourMarqueurs(liste) {
   liste.forEach((sig) => {
     if (!sig.latitude || !sig.longitude) return
 
-    const customIcon = creerIconeStatut(sig.statut)
+    const customIcon = creerIconeCategorie(sig.categories?.nom)
     const marker = L.marker([Number(sig.latitude), Number(sig.longitude)], { 
       icon: customIcon,
       riseOnHover: true
@@ -429,6 +432,20 @@ function formaterDate(dateStr) {
   flex-shrink: 0;
 }
 
+.legend-category-pin {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 2px solid white;
+  border-radius: 50%;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 800;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
+}
+
 .legend-info {
   display: flex;
   flex-direction: column;
@@ -545,6 +562,9 @@ function formaterDate(dateStr) {
 }
 
 .sheet-distance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--color-primary, #1F4D3A);
@@ -577,6 +597,9 @@ function formaterDate(dateStr) {
 }
 
 .btn-voir-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   background-color: var(--color-primary, #1F4D3A);
   color: #FFFFFF;
   border: none;

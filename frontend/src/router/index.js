@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Accueil from '../views/Accueil.vue'
 import Signalement from '../views/Signalement.vue'
+import SignalementIA from '../views/SignalementIA.vue'
 import Carte from '../views/Carte.vue'
 import Nettoyage from '../views/Nettoyage.vue'
 import Classement from '../views/Classement.vue'
@@ -21,6 +22,11 @@ const routes = [
     name: 'Signaler',
     component: Signalement,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/signalement-ia',
+    name: 'SignalementIA',
+    component: SignalementIA
   },
   {
     path: '/carte',

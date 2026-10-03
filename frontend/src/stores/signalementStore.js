@@ -1,24 +1,26 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase, supabaseConfigured } from '../services/supabaseClient'
+import { rechercherAdresse } from '../services/geocodage'
 import imageCompression from 'browser-image-compression'
 
 // Catégories de secours avec barème officiel Greenshot Burundi
+// `icone` référence un nom d'icône du composant <Icone> (src/components/Icone.vue)
 const CATEGORIES_SECOURS = [
-  { id: 'cat-plastique', nom: 'Déchets plastiques', points_signalement: 10, points_nettoyage: 30, icone: '🥤' },
-  { id: 'cat-decharge', nom: 'Décharge sauvage', points_signalement: 15, points_nettoyage: 45, icone: '⚠️' },
-  { id: 'cat-eau', nom: 'Pollution eau', points_signalement: 20, points_nettoyage: 50, icone: '💧' },
-  { id: 'cat-foret', nom: 'Déforestation', points_signalement: 20, points_nettoyage: 60, icone: '🌳' },
-  { id: 'cat-autre', nom: 'Autre', points_signalement: 10, points_nettoyage: 25, icone: '📍' }
+  { id: 'cat-plastique', nom: 'Déchets plastiques', points_signalement: 10, points_nettoyage: 30, icone: 'bouteille' },
+  { id: 'cat-decharge', nom: 'Décharge sauvage', points_signalement: 15, points_nettoyage: 45, icone: 'alerte' },
+  { id: 'cat-eau', nom: 'Pollution eau', points_signalement: 20, points_nettoyage: 50, icone: 'goutte' },
+  { id: 'cat-foret', nom: 'Déforestation', points_signalement: 20, points_nettoyage: 60, icone: 'arbre' },
+  { id: 'cat-autre', nom: 'Autre', points_signalement: 10, points_nettoyage: 25, icone: 'localisation' }
 ]
 
 function associerIcone(nom) {
   const nomLower = (nom || '').toLowerCase()
-  if (nomLower.includes('plastique')) return '🥤'
-  if (nomLower.includes('déch') || nomLower.includes('sauvage')) return '⚠️'
-  if (nomLower.includes('eau') || nomLower.includes('rivière') || nomLower.includes('lac')) return '💧'
-  if (nomLower.includes('forêt') || nomLower.includes('arbre')) return '🌳'
-  return '📍'
+  if (nomLower.includes('plastique')) return 'bouteille'
+  if (nomLower.includes('déch') || nomLower.includes('sauvage')) return 'alerte'
+  if (nomLower.includes('eau') || nomLower.includes('rivière') || nomLower.includes('lac')) return 'goutte'
+  if (nomLower.includes('forêt') || nomLower.includes('arbre')) return 'arbre'
+  return 'localisation'
 }
 
 export const useSignalementStore = defineStore('signalement', () => {
@@ -107,6 +109,7 @@ export const useSignalementStore = defineStore('signalement', () => {
   function capturerGeolocalisation() {
     statutGps.value = 'en_cours'
     messageErreurGps.value = ''
+    zoneDetectee.value = 'Recherche de la ville et du quartier…'
 
     if (!('geolocation' in navigator)) {
       statutGps.value = 'erreur'
@@ -121,28 +124,18 @@ export const useSignalementStore = defineStore('signalement', () => {
         precisionGps.value = Math.round(pos.coords.accuracy || 0)
         statutGps.value = 'succes'
 
-        // Tentative de géocodage inversé léger pour enrichir l'affichage
-        zoneDetectee.value = 'Position GPS détectée'
+        zoneDetectee.value = `${latitude.value.toFixed(5)}, ${longitude.value.toFixed(5)}`
         try {
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 2500)
-
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude.value}&lon=${longitude.value}&zoom=14`,
-            { signal: controller.signal }
-          )
-          clearTimeout(timeoutId)
-
-          if (res.ok) {
-            const data = await res.json()
-            const adresse = data.address || {}
-            const quartier = adresse.suburb || adresse.neighbourhood || adresse.quarter || ''
-            const ville = adresse.city || adresse.town || adresse.village || 'Bujumbura'
-            zoneDetectee.value = quartier ? `${ville} (${quartier})` : ville
-          }
+          const adresse = await rechercherAdresse({
+            latitude: latitude.value,
+            longitude: longitude.value
+          })
+          const ville = adresse.ville || 'Ville non identifiée'
+          zoneDetectee.value = adresse.quartier
+            ? `${ville} (${adresse.quartier})`
+            : ville
         } catch {
-          // Si le géocodage inversé échoue (offline ou timeout), on garde le label GPS par défaut
-          zoneDetectee.value = `${latitude.value.toFixed(4)}, ${longitude.value.toFixed(4)}`
+          // Keep the GPS coordinates when the reverse-geocoding service is unavailable.
         }
       },
       (err) => {
@@ -194,7 +187,11 @@ export const useSignalementStore = defineStore('signalement', () => {
 
   async function compresserImage(fichier) {
     const options = {
-      maxSizeMB: 1.0, // Cible Greenshot Burundi : max 1 Mo
+      // Le bucket `signalements-photos` refuse tout fichier > 1 Mo
+      // (file_size_limit). Viser exactement 1 Mo ne laisse aucune marge :
+      // le moindre octet d'en-tête suffit à faire rejeter l'upload alors que
+      // la compression a réussi. On vise 0.8 Mo.
+      maxSizeMB: 0.8,
       maxWidthOrHeight: 1280, // Largeur/Hauteur max 1280px pour économiser la data
       useWebWorker: true,
       fileType: 'image/jpeg'
@@ -213,8 +210,12 @@ export const useSignalementStore = defineStore('signalement', () => {
     const ext = fichier.name?.split('.').pop() || 'jpg'
     const nomFichier = `signalement_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`
 
-    // Essai prioritaire sur le bucket : 'photos-signalements', avec fallback 'signalements-photos'
-    const bucketsPossibles = ['photos-signalements', 'signalements-photos']
+    // Le bucket qui existe est `signalements-photos` (créé par
+    // backend/policies/storage_policies.sql). `photos-signalements` n'a jamais
+    // été créé : le tenter d'abord ne faisait qu'ajouter un upload voué à
+    // l'échec avant le bon. Nom conservé en repli pour un environnement
+    // existant qui l'aurait déjà déployé.
+    const bucketsPossibles = ['signalements-photos', 'photos-signalements']
     let uploadSucces = false
     let urlPublique = ''
     let dernierErreur = null
@@ -266,6 +267,23 @@ export const useSignalementStore = defineStore('signalement', () => {
       return { success: false, error: messageErreurEnvoi.value }
     }
 
+    // L'ID auteur est résolu AVANT toute compression/upload : le faire après
+    // laissait des photos orphelines dans le bucket à chaque envoi refusé.
+    // Il n'existe plus de mode démo : on ne peut plus attribuer le signalement
+    // à un profil tiers ni à un UUID fictif (ce qui aurait forgé la paternité
+    // d'un signalement au nom d'un citoyen, et échoué sur la clé étrangère
+    // vers auth.users de toute façon).
+    let userId = userStore?.user?.id
+    if (!userId) {
+      const { data: sessionData } = await supabase.auth.getSession()
+      userId = sessionData?.session?.user?.id || null
+    }
+
+    if (!userId) {
+      messageErreurEnvoi.value = 'Vous devez être connecté pour déposer un signalement. Vos données et votre photo sont conservées : reconnectez-vous puis renvoyez.'
+      return { success: false, error: messageErreurEnvoi.value }
+    }
+
     envoiEnCours.value = true
     messageErreurEnvoi.value = ''
     estErreurReseau.value = false
@@ -281,47 +299,6 @@ export const useSignalementStore = defineStore('signalement', () => {
 
       // 3. Déterminer l'ID utilisateur
       etapeEnvoi.value = 'enregistrement'
-      let userId = userStore?.user?.id
-
-      if (!userId) {
-        // Vérifier session Supabase active
-        const { data: sessionData } = await supabase.auth.getSession()
-        if (sessionData?.session?.user) {
-          userId = sessionData.session.user.id
-          if (userStore?.setSession) {
-            userStore.setSession(sessionData.session.user)
-          }
-        }
-      }
-
-      // Si pas encore d'utilisateur connecté, tenter de récupérer un profil démo ou créer session anonyme
-      if (!userId) {
-        try {
-          const { data: anonData } = await supabase.auth.signInAnonymously()
-          if (anonData?.user) {
-            userId = anonData.user.id
-          }
-        } catch {
-          // Supabase Auth anonyme pas activée
-        }
-      }
-
-      // Si toujours aucun utilisateur connecté, tenter le profil utilisateur par défaut
-      if (!userId) {
-        // En mode démo / premier test sans compte connecté
-        const { data: premierProfil } = await supabase
-          .from('profiles')
-          .select('id')
-          .limit(1)
-          .maybeSingle()
-
-        if (premierProfil?.id) {
-          userId = premierProfil.id
-        } else {
-          // Identifiant démo par défaut
-          userId = '00000000-0000-0000-0000-000000000000'
-        }
-      }
 
       // Vérifier si la catégorie est un UUID valide (au cas où on est sur les IDs de secours 'cat-plastique')
       let idCategorieFinale = categorieId.value
@@ -342,6 +319,16 @@ export const useSignalementStore = defineStore('signalement', () => {
       }
 
       // 4. Insertion dans la table signalements (conformément aux colonnes autorisées par RLS)
+      // Note : statut n'est PAS inclus car la RLS interdit de le définir à l'insertion
+      const dateCapturePhoto = new Date(photoFichier.value.lastModified || Date.now())
+      const descriptionFinale = [
+        description.value?.trim(),
+        `Photo capturée le ${new Intl.DateTimeFormat('fr-BI', {
+          dateStyle: 'medium',
+          timeStyle: 'short'
+        }).format(dateCapturePhoto)}`
+      ].filter(Boolean).join(' | ')
+
       const { data: signalementCree, error: insertError } = await supabase
         .from('signalements')
         .insert({
@@ -351,7 +338,7 @@ export const useSignalementStore = defineStore('signalement', () => {
           latitude: Number(latitude.value),
           longitude: Number(longitude.value),
           ville: zoneDetectee.value || 'Bujumbura',
-          description: description.value ? description.value.trim() : null
+          description: descriptionFinale
         })
         .select()
         .single()
@@ -465,8 +452,18 @@ export const useSignalementStore = defineStore('signalement', () => {
     chargementSignalements.value = true
     erreurSignalements.value = null
 
+    // Données de démonstration : UNIQUEMENT en développement local.
+    // En production, ces signalements fictifs s'afficheraient sur la carte avec
+    // de vraies coordonnées de Bujumbura et de vraies photos de décharges : un
+    // citoyen ou un bailleur les prendrait pour de vrais signalements, ce qui
+    // est inacceptable pour un projet dont la promesse est la fiabilité de la
+    // donnée (garde ajoutée côté dev, appliqué ici à la source unique qu'est
+    // le store — Carte.vue, Profil.vue et le détail consomment tous cette liste).
+    const demoAutorisee = import.meta.env.DEV
+    const signalementsDemo = () => (demoAutorisee ? SIGNALEMENTS_DEMO : [])
+
     if (!supabaseConfigured) {
-      listeSignalements.value = SIGNALEMENTS_DEMO
+      listeSignalements.value = signalementsDemo()
       chargementSignalements.value = false
       return listeSignalements.value
     }
@@ -482,14 +479,14 @@ export const useSignalementStore = defineStore('signalement', () => {
       if (data && data.length > 0) {
         listeSignalements.value = data
       } else {
-        // Si la base est encore vide, charger les signalements démo de qualité
-        listeSignalements.value = SIGNALEMENTS_DEMO
+        // Base vide : on reste sur la liste vide en production
+        listeSignalements.value = signalementsDemo()
       }
     } catch (err) {
-      console.warn('Erreur chargement Supabase signalements, utilisation données de démonstration:', err)
+      console.warn('Erreur chargement Supabase signalements:', err)
       erreurSignalements.value = err.message || 'Impossible de joindre le serveur'
       if (listeSignalements.value.length === 0) {
-        listeSignalements.value = SIGNALEMENTS_DEMO
+        listeSignalements.value = signalementsDemo()
       }
     } finally {
       chargementSignalements.value = false

@@ -25,11 +25,18 @@
           :class="{ 'chip-active': categoriesSelectionnees.includes(cat.id) }"
           @click="basculerCategorie(cat.id)"
         >
-          <span class="chip-icon">{{ cat.icone || '📍' }}</span>
+          <span class="chip-icon"><Icone :nom="cat.icone || 'localisation'" taille="15px" :trait="2.2" /></span>
           <span class="chip-label">{{ cat.nom }}</span>
           <span class="chip-count">{{ compterSignalementsParCategorie(cat.id, cat.nom) }}</span>
         </button>
 
+      </div>
+      <div class="map-sync-status" aria-live="polite">
+        <span class="sync-dot" :class="{ live: realtimeActif }"></span>
+        <span>{{ realtimeActif ? 'Signalements en temps réel' : 'Actualisation automatique chaque minute' }}</span>
+        <button type="button" class="map-refresh-button" :disabled="store.chargementSignalements" @click="rafraichirSignalements">
+          Actualiser
+        </button>
       </div>
     </div>
 
@@ -44,13 +51,13 @@
     <!-- Message d'état vide encourageant -->
     <transition name="fade">
       <div v-if="!store.chargementSignalements && signalementsFiltres.length === 0" class="empty-state-floating">
-        <div class="empty-icon">🌱</div>
+        <div class="empty-icon"><Icone nom="feuille" /></div>
         <div class="empty-text">
           <strong>Aucun signalement dans cette sélection</strong>
           <p>Soyez le premier à signaler un déchet dans cette zone !</p>
         </div>
         <router-link to="/signaler" class="btn-nouveau-signalement">
-          📸 Signaler (+pts)
+          <Icone nom="image" /> Signaler (+pts)
         </router-link>
       </div>
     </transition>
@@ -65,15 +72,43 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useSignalementStore } from '../stores/signalementStore'
+import { supabase, supabaseConfigured } from '../services/supabaseClient'
 import CarteInteractive from '../components/CarteInteractive.vue'
+import Icone from '../components/Icone.vue'
 
 const store = useSignalementStore()
 
 const categoriesSelectionnees = ref([])
+const realtimeActif = ref(false)
+let realtimeChannel = null
+let refreshInterval = null
+let refreshTimeout = null
 
 onMounted(async () => {
+  if (supabaseConfigured) {
+    realtimeChannel = supabase
+      .channel('greenshot-carte-signalements')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'signalements'
+      }, () => {
+        clearTimeout(refreshTimeout)
+        refreshTimeout = setTimeout(rafraichirSignalements, 250)
+      })
+      .subscribe((status) => {
+        realtimeActif.value = status === 'SUBSCRIBED'
+      })
+  }
+
+  refreshInterval = setInterval(() => {
+    if (!realtimeActif.value && !store.chargementSignalements) {
+      rafraichirSignalements()
+    }
+  }, 60000)
+
   // 1. Charger les catégories si pas encore fait
   if (!store.categoriesChargees) {
     await store.chargerCategories()
@@ -87,6 +122,16 @@ onMounted(async () => {
     store.capturerGeolocalisation()
   }
 })
+
+onUnmounted(() => {
+  clearInterval(refreshInterval)
+  clearTimeout(refreshTimeout)
+  if (realtimeChannel) supabase.removeChannel(realtimeChannel)
+})
+
+function rafraichirSignalements() {
+  if (!store.chargementSignalements) return store.chargerTousLesSignalements()
+}
 
 const signalementsBruts = computed(() => {
   return store.listeSignalements || []
@@ -180,18 +225,78 @@ function compterSignalementsParCategorie(catId, catNom) {
   pointer-events: none;
 }
 
+.map-sync-status {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.15rem 0 0 0.65rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #475569;
+  font-size: 0.72rem;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  /* le conteneur parent désactive les événements : on les rétablit ici */
+  pointer-events: auto;
+}
+
+.sync-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+.sync-dot.live {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px #dcfce7;
+}
+
+.map-refresh-button {
+  padding: 0.2rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: white;
+  color: #334155;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.map-refresh-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 .chips-scroll {
   display: flex;
   gap: 0.45rem;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 4px 2px 8px;
   pointer-events: auto;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(31, 77, 58, 0.3) transparent;
 }
 
 .chips-scroll::-webkit-scrollbar {
-  display: none;
+  height: 5px;
+}
+
+.chips-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chips-scroll::-webkit-scrollbar-thumb {
+  background: rgba(31, 77, 58, 0.3);
+  border-radius: 9999px;
 }
 
 .filter-chip {
@@ -213,6 +318,7 @@ function compterSignalementsParCategorie(catId, catNom) {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-tap-highlight-color: transparent;
   flex-shrink: 0;
+  scroll-snap-align: start;
 }
 
 .filter-chip:hover {
@@ -228,8 +334,13 @@ function compterSignalementsParCategorie(catId, catNom) {
 }
 
 .chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
   font-size: 0.85rem;
 }
+
 
 .chip-count {
   font-size: 0.68rem;
@@ -294,6 +405,9 @@ function compterSignalementsParCategorie(catId, catNom) {
 }
 
 .empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.5rem;
   flex-shrink: 0;
 }
@@ -318,6 +432,9 @@ function compterSignalementsParCategorie(catId, catNom) {
 }
 
 .btn-nouveau-signalement {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   background: var(--color-primary, #1F4D3A);
   color: #FFFFFF;
   text-decoration: none;
