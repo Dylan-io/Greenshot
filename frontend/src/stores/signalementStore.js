@@ -318,9 +318,10 @@ export const useSignalementStore = defineStore('signalement', () => {
         }
       }
 
-      // 4. Insertion dans la table signalements
+      // 4. Insertion dans la table signalements (conformément aux colonnes autorisées par RLS)
+      // Note : statut n'est PAS inclus car la RLS interdit de le définir à l'insertion
       const dateCapturePhoto = new Date(photoFichier.value.lastModified || Date.now())
-      const descriptionAvecDate = [
+      const descriptionFinale = [
         description.value?.trim(),
         `Photo capturée le ${new Intl.DateTimeFormat('fr-BI', {
           dateStyle: 'medium',
@@ -336,13 +337,16 @@ export const useSignalementStore = defineStore('signalement', () => {
           photo_avant_url: photoUrl,
           latitude: Number(latitude.value),
           longitude: Number(longitude.value),
-          description: descriptionAvecDate,
-          statut: 'en_attente'
+          ville: zoneDetectee.value || 'Bujumbura',
+          description: descriptionFinale
         })
         .select()
         .single()
 
       if (insertError) {
+        if (insertError.code === '42501') {
+          throw new Error("Signalement refusé : vous devez être connecté et avoir vérifié votre adresse email.")
+        }
         throw insertError
       }
 

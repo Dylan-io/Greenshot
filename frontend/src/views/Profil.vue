@@ -110,15 +110,16 @@ const mesSignalements = ref([])
 const mesNettoyages = ref([])
 
 // Valeurs initiales. En développement on garde un profil de démonstration
-// pour travailler la mise en page ; en production, un profil vide — afficher
-// un faux citoyen et ses faux points à un visiteur non connecté serait
-// trompeur, d'autant que « Dyllan N. » ressemble à un cas réel.
+// pour travailler la mise en page ; en production, un profil vide pour ne pas afficher
+// un faux citoyen à un visiteur non connecté.
 const profile = ref(import.meta.env.DEV
   ? {
+      id: 'usr-7',
       nom: 'Dyllan N.',
-      ville: 'Bujumbura, Burundi',
-      score_signalement: 30,
-      score_nettoyage: 90
+      ville: 'Bujumbura (Ngagara)',
+      score_signalement: 40,
+      score_nettoyage: 80,
+      created_at: new Date('2026-03-01T10:00:00Z').toISOString()
     }
   : {
       nom: '',
@@ -142,23 +143,38 @@ async function chargerProfil() {
       // Colonnes explicitement listées : email / phone / email_verified ne
       // sont plus accordées au rôle client (protection des PII). Le profil
       // complet est déjà chargé par le store via obtenir_mon_profil().
-      const { data: prof } = await supabase
+      const { data: prof, error: profError } = await supabase
         .from('profiles')
         .select('id, nom, ville, username, score_signalement, score_nettoyage, created_at')
         .eq('id', userId)
-        .single()
-      if (prof) profile.value = { ...profile.value, ...prof }
+        .maybeSingle()
 
-      const { data: sigs } = await supabase.from('signalements').select('*, categories(nom)').eq('user_id', userId)
-      if (sigs) mesSignalements.value = sigs
+      if (!profError && prof) {
+        profile.value = { ...profile.value, ...prof }
+        userStore.profile = { ...userStore.profile, ...prof }
+      }
 
-      const { data: cleans } = await supabase.from('signalements').select('*, categories(nom)').eq('nettoye_par_user_id', userId)
-      if (cleans) mesNettoyages.value = cleans
+      // Charger les signalements faits par l'utilisateur
+      const { data: sigData } = await supabase
+        .from('signalements')
+        .select('*, categories(nom, points_signalement, points_nettoyage)')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+
+      mesSignalements.value = sigData || []
+
+      // Charger les nettoyages réalisés par l'utilisateur
+      const { data: cleanData } = await supabase
+        .from('signalements')
+        .select('*, categories(nom, points_signalement, points_nettoyage)')
+        .eq('nettoye_par_user_id', userId)
+        .order('date_nettoyage', { ascending: false })
+
+      mesNettoyages.value = cleanData || []
     } else if (import.meta.env.DEV) {
       // Données de démonstration : UNIQUEMENT en développement local.
       // Un visiteur non connecté qui ouvrirait /profil en production ne doit
-      // pas voir un profil « Dyllan N. » avec un historique de nettoyages
-      // qui n'a jamais eu lieu.
+      // pas voir un profil « Dyllan N. » avec un historique fictif.
       mesSignalements.value = [
         {
           id: 'sig-demo-1',

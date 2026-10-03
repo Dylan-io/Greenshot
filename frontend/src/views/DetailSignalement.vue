@@ -108,6 +108,7 @@ onMounted(async () => {
 
 async function chargerDetails() {
   chargement.value = true
+  const idRecherche = signalementId
   try {
     // 1. Récupération du signalement
     const { data, error } = await supabase
@@ -117,47 +118,38 @@ async function chargerDetails() {
       .single()
 
     if (error) throw error
-    signalement.value = data
 
-    // 2. Récupération de l'historique des statuts
-    const { data: histData } = await supabase
-      .from('statuts_historique')
-      .select('*')
-      .eq('signalement_id', signalementId)
-      .order('date', { ascending: true })
+    if (data) {
+      signalement.value = data
 
-    historique.value = histData || []
+      // 2. Récupération de l'historique des statuts
+      const { data: histData } = await supabase
+        .from('statuts_historique')
+        .select('*')
+        .eq('signalement_id', signalementId)
+        .order('date', { ascending: true })
 
-    if (historique.value.length === 0 && data) {
-      historique.value = [
-        { nouveau_statut: 'en_attente', date: data.created_at }
-      ]
-      if (data.statut === 'nettoye' && data.date_nettoyage) {
-        historique.value.push({ nouveau_statut: 'nettoye', date: data.date_nettoyage })
+      historique.value = histData || []
+
+      // Si pas d'historique en base, générer un historique minimal à partir du signalement
+      if (historique.value.length === 0) {
+        historique.value = [
+          { nouveau_statut: 'en_attente', date: data.created_at }
+        ]
+        if (data.statut === 'nettoye' && data.date_nettoyage) {
+          historique.value.push({ nouveau_statut: 'nettoye', date: data.date_nettoyage })
+        }
+      }
+    } else {
+      // Données de démonstration : UNIQUEMENT en développement local
+      if (import.meta.env.DEV) {
+        signalement.value = SIGNALEMENTS_DEMO[idRecherche] || SIGNALEMENTS_DEMO['sig-buj-1']
       }
     }
   } catch (err) {
     console.warn('Erreur chargement signalement:', err)
-    // Signalement de démonstration : UNIQUEMENT en développement local.
-    // En production, un identifiant inconnu afficherait un faux signalement
-    // avec une fausse déclarante (« Aline N. ») et une fausse photo : on ne
-    // doit jamais faire croire qu'un citoyen a signalé un problème qui
-    // n'existe pas.
     if (import.meta.env.DEV) {
-      signalement.value = {
-        id: signalementId,
-        statut: 'en_attente',
-        ville: 'Bujumbura (Centre)',
-        photo_avant_url: 'https://images.unsplash.com/photo-1605600659873-d808a13e4d2a?w=600',
-        photo_apres_url: null,
-        description: 'Accumulation de bouteilles en plastique et sachets non dégradables.',
-        categories: { nom: 'Déchets plastiques' },
-        profiles: { nom: 'Aline N.' },
-        created_at: new Date().toISOString()
-      }
-      historique.value = [
-        { nouveau_statut: 'en_attente', date: new Date().toISOString() }
-      ]
+      signalement.value = SIGNALEMENTS_DEMO[idRecherche] || SIGNALEMENTS_DEMO['sig-buj-1']
     }
   } finally {
     chargement.value = false
